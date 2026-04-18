@@ -1,0 +1,77 @@
+Bugs:
+
+Some skills like fortitude has to add total health bar to higher and right now it does nothing.
+
+while in improve stats mode, all dots should be aligned as now they are not aligned and rely on - and + signs
+
+when choosing predator type or any skills that gives discipline power should be chose as suggested option B. in cloude B) Separate "Apply Predator Type" action
+  A dedicated button that only appears if predator type is unset. Keeps it
+  visually distinct and prevents accidental re-triggering.
+
+figure out what happens when predator type selection is skipped in the wizard.
+
+for advantages/flaws also add an i icon to view more details.
+
+in merits flaws add additional text for example in linguistics if i add language please show them. also again keep the dots in one aligned order.
+
+when i press edit profile lets change it and make edit ambition and desire. 
+
+add additional button next to it that counts as state. Condition represents what GM can pick or you can pick. meaning you can become unconscious or burning. and also add a color for mild severe or moderate. add info icon if gm added notes, and condition name
+
+Condition name should also be seen in character card while its minimized. in character minimized card don't show skills or attributes, maybe just highlight disciplines and powers. in session mode. health and willpower always show full square rows, meaning for health there are 15 in total and for willpower 15 in total. and of course if some are not used grey them out as it is made in character sheet for single user.
+
+in character sheet also make that ambition is top and desire is bottom don't make them side to side. 
+
+in character sheet  separate a card for clan predator type and generation in separate bracket. make it side by side with first bracket.
+
+additional feature. try to fit merits flaws and background in negative left side of the character sheet. sidebar if it becomes smaller move it back to where it was, make it be scalable for different screen resolutions.
+
+also when user presses leave the night, always do the check if the session is saved. and as soon at is done then close it. if for example user lost humanity point him to roll humanity check
+
+bug in backgrounds, there also need to be + - for dots as there are also levels there. for examples resources.
+
+check that other predator types add disciplines and pluses, please check link provided before for information and if you don't have links ask for them. 
+
+also doublecheck flaws, not all flaws are there as for example looks flaw in not added.
+
+as mentioned sometimes fortitude adds health based on resilience skill it needs to add automatically. what i would ask is to go through each specific skill and see what kind of mechanic is needed.
+
+in character sheet when we press edit we should also have an ability to add flaws metrist and backgrounds.
+
+in GM mode, when i add a player i want to in the future add more character right now i cant. also when there are wrong players added to the character group i want to have an ability to delete them.
+
+in gm mode sometimes groups delete themselves automatically. in session mode. as gm i want to be able to change and edit players also and add the condition. simple view is more for basic viewing not a session.
+
+also added images in assets folder of the my-vampire=project where you can use them for each specific clan background. again make them dark and ad dome noise but not animated on top. dont use the one called *not use*
+
+---
+
+Completed changes (Session 2026-04-13 continued):
+
+Clan background images:
+- Added 16 images (one per clan) from assets folder to frontend, mapped thematically to each clan
+- Applied clan background to: player character sheet page, GM group view character cards, GM session mode character cards
+- Background scrolls naturally with the page so tall images fill the sheet as you scroll down (not fixed/sticky)
+- Dark overlay on full page background (94% black) so image is subtle texture behind content
+- Clan card (Clan/Predator/Generation card in header) has a lighter overlay (75%) so image is more visible there
+- Static SVG noise added on top of background (no animation)
+- Image 6 replaced by user — reassigned to Gangrel (dark nature/flowers); Ministry moved to image 13 (bat-demon)
+- Thin-Blood shares image with Caitiff (lone sword) as no 16th image exists (5.jpg missing from set)
+
+Login screen:
+- Background replaced with "not use.jpg" (skull/flower gothic image)
+- Animated TV static canvas noise replaced with static SVG fractal noise (no animation)
+- Dark overlay made heavier (radial 0.65–0.95, gradient 0.85/0.55/0.92)
+- Blood drip animation kept in code but disabled — uncomment <BloodDrips /> in LoginPage.jsx to re-enable
+
+GM group view (character cards):
+- Clan background image applied to each character card
+- Removed top skills section from cards
+- Added disciplines with dot ratings instead
+
+Session mode character cards:
+- Already showed disciplines and no skills/attributes (done previous session)
+- Clan background image applied to each player card
+
+Character sheet background:
+- Darkened from 88% to 94% overlay across all character sheets
