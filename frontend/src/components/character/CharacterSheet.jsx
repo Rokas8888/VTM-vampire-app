@@ -239,7 +239,9 @@ function PowerCard({ power }) {
 // Normal mode: only learned powers shown as expandable cards.
 // Improve mode: also shows available (unlearned, within current dot level) with XP buttons.
 // Raising a dot: V5 includes ONE free power at the new level — show a picker before submitting.
-function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove, availableXp, onClaimFreePower, tempDots, onAddTempDot, onRemoveTempDot }) {
+const RITUAL_DISC_NAMES = ["Blood Sorcery", "Oblivion"];
+
+function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove, availableXp, onClaimFreePower, tempDots, onAddTempDot, onRemoveTempDot, freeEdit, onRemoveDiscipline, learnedRituals = [], onOpenRitualBook }) {
   const disc        = cd.discipline;
   const allPowers   = disc.powers ?? [];
   const newLevel    = cd.level + 1;
@@ -249,7 +251,7 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
   // V5: additional power = flat 3 (in-clan) or 5 (out-of-clan)
   const extraPowerCost = isInClan ? 3 : 5;
 
-  const canUpgrade = onImprove && cd.level < 5 && availableXp >= upgradeCost;
+  const canUpgrade = onImprove && cd.level < 5 && (freeEdit || availableXp >= upgradeCost);
 
   // Powers at the NEW level that aren't learned yet (candidates for the free pick on upgrade)
   const freeCandidates = allPowers.filter(
@@ -312,6 +314,13 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
           <span className="font-gothic text-lg text-gray-200">{disc.name}</span>
+          {freeEdit && onRemoveDiscipline && (
+            <button
+              onClick={() => onRemoveDiscipline(disc.id)}
+              className="text-gray-700 hover:text-blood text-xs transition-colors"
+              title="Remove discipline"
+            >✕</button>
+          )}
           {!isInClan && (onImprove || onUnimprove) && (
             <span className="ml-2 text-xs text-gray-600 italic">out-of-clan</span>
           )}
@@ -470,6 +479,38 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
         </div>
       )}
 
+      {/* ── Rituals / Ceremonies (Blood Sorcery & Oblivion only) ── */}
+      {RITUAL_DISC_NAMES.includes(disc.name) && (
+        <div className="mt-3 pt-3 border-t border-void-border/40">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-gothic">
+              {disc.name === "Oblivion" ? "Ceremonies" : "Rituals"}
+            </p>
+            <button
+              onClick={onOpenRitualBook}
+              className="flex items-center gap-1 text-xs text-blood-dark hover:text-blood border border-blood-dark/40 hover:border-blood/60 rounded px-2 py-0.5 transition-colors font-gothic tracking-wide"
+            >
+              📖 Ritual Book
+              {learnedRituals.length === 0 && (
+                <span className="text-yellow-500" title="Free ritual to claim!">⚠</span>
+              )}
+            </button>
+          </div>
+          {learnedRituals.length === 0 ? (
+            <p className="text-gray-700 text-xs italic">No {disc.name === "Oblivion" ? "ceremonies" : "rituals"} learned.</p>
+          ) : (
+            <div className="space-y-0.5">
+              {learnedRituals.map(cr => (
+                <div key={cr.id} className="flex items-center gap-2 text-xs">
+                  <span className="text-blood-dark w-12 shrink-0">{"●".repeat(cr.ritual.level)}</span>
+                  <span className="text-gray-400">{cr.ritual.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Power info popup — triggered by ℹ buttons inside pickers */}
       {powerInfo && (
         <div
@@ -509,7 +550,7 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
 }
 
 // ── Attribute/skill column ────────────────────────────────────────────────────
-function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot }) {
+function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot, freeEdit }) {
   const minVal = traitType === "attribute" ? 1 : 0;
   return (
     <div className="flex-1 min-w-[160px]">
@@ -520,7 +561,7 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
         const specs       = specialtyMap?.[name] ?? [];
         const buyCost     = traitType === "attribute" ? (val + 1) * 5 : (val + 1) * 3;
         const refund      = traitType === "attribute" ? val * 5 : val * 3;
-        const canAfford   = onImprove && val < 5 && availableXp >= buyCost;
+        const canAfford   = onImprove && val < 5 && (freeEdit || availableXp >= buyCost);
         const tempVal     = tempDotsMap?.[name] ?? 0;
         return (
           <div key={name} className="flex justify-between items-center mb-1 gap-2">
@@ -626,6 +667,8 @@ export default function CharacterSheet({
   onClaimFreePower,  // (powerId) — called when player claims free predator-type power
   tempMode = false,  // when true, shows blue temp-dot +/- buttons
   onSetTempDots,     // (tempDotsObj) — saves temp dots to backend
+  freeEdit = false,  // when true, all stats editable for free (retainer mode)
+  onOpenRetainer,    // (retainerId) — opens retainer sheet
 }) {
   const availableXp = character.total_xp - character.spent_xp;
 
@@ -643,12 +686,23 @@ export default function CharacterSheet({
   const [autoSaveStatus,  setAutoSaveStatus]  = useState(null); // null | "saving" | "saved"
   const autoSaveTimer = useRef(null);
 
+  // Add discipline (retainer only)
+  const [showAddDisc, setShowAddDisc] = useState(false);
+  const [availDiscs, setAvailDiscs] = useState([]);
+  const [addDiscId, setAddDiscId] = useState(null);
+
   // Retainers
   const [showRetainerForm, setShowRetainerForm] = useState(false);
   const [retainerName, setRetainerName] = useState("");
   const [retainerConcept, setRetainerConcept] = useState("");
+  const [retainerLevel, setRetainerLevel] = useState("");
   const [retainerSaving, setRetainerSaving] = useState(false);
-  const retainerMeritCount = character.merits.filter(m => m.merit.name.toLowerCase().includes("retainer")).length;
+  const retainerMerits = character.merits.filter(m => m.merit.name.toLowerCase().includes("retainer"));
+  const retainerMeritCount = retainerMerits.length;
+  // Levels already claimed by existing retainers
+  const usedRetainerLevels = (character.retainers || []).map(r => r.retainer_level).filter(Boolean);
+  // Available levels = retainer merit levels not yet assigned to a retainer
+  const availableRetainerLevels = retainerMerits.map(m => m.level).filter(lvl => !usedRetainerLevels.includes(lvl));
 
   // Portrait upload
   const [portraitUrl, setPortraitUrl] = useState(character.portrait_url || null);
@@ -717,6 +771,16 @@ export default function CharacterSheet({
 
   // Add-merit/flaw/background panel (shown when onImprove is active OR editAdvantages is on)
   const [editAdvantages, setEditAdvantages] = useState(false);
+  // Ritual book
+  const [showRitualBook, setShowRitualBook] = useState(false);
+  const [ritualBookDiscId, setRitualBookDiscId] = useState(null); // which discipline opened the book
+  const [allRituals, setAllRituals] = useState([]);
+  const [ritualSearch, setRitualSearch] = useState("");
+  const [ritualLevelFilter, setRitualLevelFilter] = useState([]); // [] = all
+  const [ritualInfoId, setRitualInfoId] = useState(null);
+  const [ritualError, setRitualError] = useState(null);
+  const [ritualPage, setRitualPage] = useState(0);
+
   const [showAddAdvantage, setShowAddAdvantage] = useState(false);
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -1155,34 +1219,34 @@ export default function CharacterSheet({
 
       {/* ── Attributes ── */}
       <Section title="Attributes">
-        {onImprove && <p className="text-xs text-gray-600 mb-3">Cost: new level × 5 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
+        {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 5 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
         {tempMode && <p className="text-xs text-blue-500/70 mb-3">Temp mode active — blue dots are temporary and not XP-spent.</p>}
         <div className="flex flex-wrap gap-6">
-          <StatColumn heading="Physical" names={PHYSICAL_ATTRS}  lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Physical" names={PHYSICAL_ATTRS}  lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
-          <StatColumn heading="Social"   names={SOCIAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Social"   names={SOCIAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
-          <StatColumn heading="Mental"   names={MENTAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Mental"   names={MENTAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
         </div>
       </Section>
 
       {/* ── Skills ── */}
       <Section title="Skills">
-        {onImprove && <p className="text-xs text-gray-600 mb-3">Cost: new level × 3 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
+        {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 3 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
         <div className="flex flex-wrap gap-6">
-          <StatColumn heading="Physical" names={PHYSICAL_SKILLS} lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Physical" names={PHYSICAL_SKILLS} lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
-          <StatColumn heading="Social"   names={SOCIAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Social"   names={SOCIAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
-          <StatColumn heading="Mental"   names={MENTAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp}
+          <StatColumn heading="Mental"   names={MENTAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
         </div>
       </Section>
 
       {/* ── Disciplines ── */}
       <Section title="Disciplines">
-        {(onImprove || onUnimprove) && (
+        {(onImprove || onUnimprove) && !freeEdit && (
           <p className="text-xs text-gray-600 mb-3">
             Raise dot: new level × 5 XP (in-clan) / × 7 XP (out-of-clan) — 1 power included per dot ·
             Available: <span className="text-blood">{availableXp} XP</span>
@@ -1210,9 +1274,67 @@ export default function CharacterSheet({
                   tempDots={discTempDots}
                   onAddTempDot={tempMode ? (discId) => handleAddTempDot("disciplines", discId) : undefined}
                   onRemoveTempDot={tempMode ? (discId) => handleRemoveTempDot("disciplines", discId) : undefined}
+                  freeEdit={freeEdit}
+                  onRemoveDiscipline={freeEdit ? async (discId) => {
+                    const res = await api.delete(`/api/characters/${character.id}/disciplines/${discId}`);
+                    if (onCharacterUpdate) onCharacterUpdate(res.data);
+                  } : undefined}
+                  learnedRituals={(character.rituals || []).filter(cr => cr.ritual.discipline_id === cd.discipline.id)}
+                  onOpenRitualBook={async () => {
+                    if (allRituals.length === 0) {
+                      const res = await api.get("/api/game-data/rituals");
+                      setAllRituals(res.data);
+                    }
+                    setRitualBookDiscId(cd.discipline.id);
+                    setShowRitualBook(true);
+                    setRitualSearch("");
+                    setRitualError(null);
+                  }}
                 />
               );
             })}
+          </div>
+        )}
+
+        {/* Add discipline — retainer (free) or improve mode (XP cost) */}
+        {onImprove && (
+          <div className="mt-3 border-t border-void-border/40 pt-3">
+            {showAddDisc ? (
+              <div className="flex gap-2 items-center flex-wrap">
+                <select
+                  value={addDiscId ?? ""}
+                  onChange={(e) => setAddDiscId(Number(e.target.value) || null)}
+                  className="vtm-input text-sm flex-1"
+                  onFocus={async () => {
+                    if (availDiscs.length === 0) {
+                      const res = await api.get("/api/game-data/disciplines");
+                      setAvailDiscs(res.data);
+                    }
+                  }}
+                >
+                  <option value="">Select discipline…</option>
+                  {availDiscs.filter((d) => !character.disciplines.some((cd) => cd.discipline.id === d.id)).map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+                <button
+                  disabled={!addDiscId}
+                  onClick={async () => {
+                    if (freeEdit) {
+                      const res = await api.post(`/api/characters/${character.id}/disciplines`, { discipline_id: addDiscId });
+                      if (onCharacterUpdate) onCharacterUpdate(res.data);
+                    } else {
+                      await onImprove("discipline", null, { discipline_id: addDiscId });
+                    }
+                    setShowAddDisc(false); setAddDiscId(null);
+                  }}
+                  className="vtm-btn text-sm py-1 px-3 disabled:opacity-40"
+                >Add</button>
+                <button onClick={() => { setShowAddDisc(false); setAddDiscId(null); }} className="text-xs text-gray-600 hover:text-gray-300">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddDisc(true)} className="text-xs text-gray-600 hover:text-blood transition-colors font-gothic tracking-wider">+ Add Discipline</button>
+            )}
           </div>
         )}
       </Section>
@@ -1260,6 +1382,9 @@ export default function CharacterSheet({
                       <div className="flex justify-between items-center text-sm gap-1">
                         <div className="flex items-center gap-1 min-w-0">
                           <span className="text-gray-300 font-medium">{cm.merit.name}</span>
+                          {cm.merit.name.toLowerCase().includes("retainer") && (character.retainers || []).length < retainerMeritCount && (
+                            <span className="text-yellow-500 text-xs ml-1" title="No retainer created for this merit">⚠</span>
+                          )}
                           {hasDesc && (
                             <button
                               onClick={() => toggleAdvantageExpand(key)}
@@ -1944,12 +2069,15 @@ export default function CharacterSheet({
             {(character.retainers || []).map((r) => (
               <div key={r.id} className="border-2 border-blue-800/60 rounded-lg p-4 bg-blue-950/10 flex justify-between items-start">
                 <div>
-                  <p className="font-gothic text-blue-300 text-lg">{r.name}</p>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="font-gothic text-blue-300 text-lg">{r.name}</p>
+                    {r.retainer_level && <span className="text-blue-700 text-sm">{"●".repeat(r.retainer_level)}</span>}
+                  </div>
                   {r.concept && <p className="text-gray-500 text-xs">{r.concept}</p>}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => window.open(`/retainer/${r.id}`, "_blank")}
+                    onClick={() => onOpenRetainer && onOpenRetainer(r.id)}
                     className="text-xs text-blue-400 hover:text-blue-200 border border-blue-800 rounded px-2 py-1 transition-colors"
                   >View Sheet</button>
                   <button
@@ -1963,6 +2091,14 @@ export default function CharacterSheet({
                 </div>
               </div>
             ))}
+
+            {(character.retainers || []).length < retainerMeritCount && !showRetainerForm && (
+              <div className="flex items-center gap-2 text-yellow-600 text-sm border border-yellow-800/40 rounded-lg px-3 py-2 bg-yellow-950/10">
+                <span>⚠</span>
+                <span>You have {retainerMeritCount - (character.retainers || []).length} unfilled retainer slot(s).</span>
+                <button onClick={() => setShowRetainerForm(true)} className="ml-auto text-xs text-blue-400 hover:text-blue-200 border border-blue-800 rounded px-2 py-1">+ Add</button>
+              </div>
+            )}
 
             {(character.retainers || []).length < retainerMeritCount && (
               showRetainerForm ? (
@@ -1980,20 +2116,33 @@ export default function CharacterSheet({
                     placeholder="Concept (human, ghoul, etc.)…"
                     className="vtm-input text-sm w-full"
                   />
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Retainer level (which merit dot)</label>
+                    <select
+                      value={retainerLevel}
+                      onChange={(e) => setRetainerLevel(e.target.value)}
+                      className="vtm-input text-sm w-full"
+                    >
+                      <option value="">— pick level —</option>
+                      {availableRetainerLevels.map(lvl => (
+                        <option key={lvl} value={lvl}>{"●".repeat(lvl)} (level {lvl})</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="flex gap-2">
                     <button
-                      disabled={!retainerName || retainerSaving}
+                      disabled={!retainerName || !retainerLevel || retainerSaving}
                       onClick={async () => {
                         setRetainerSaving(true);
                         try {
-                          const res = await api.post(`/api/characters/${character.id}/retainers`, { name: retainerName, concept: retainerConcept || null });
+                          const res = await api.post(`/api/characters/${character.id}/retainers`, { name: retainerName, concept: retainerConcept || null, retainer_level: parseInt(retainerLevel) });
                           if (onCharacterUpdate) onCharacterUpdate(res.data);
-                          setShowRetainerForm(false); setRetainerName(""); setRetainerConcept("");
+                          setShowRetainerForm(false); setRetainerName(""); setRetainerConcept(""); setRetainerLevel("");
                         } finally { setRetainerSaving(false); }
                       }}
                       className="vtm-btn py-1 px-4 text-sm disabled:opacity-40"
                     >{retainerSaving ? "Creating…" : "Create Retainer"}</button>
-                    <button onClick={() => setShowRetainerForm(false)} className="text-xs text-gray-600 hover:text-gray-300">Cancel</button>
+                    <button onClick={() => { setShowRetainerForm(false); setRetainerLevel(""); }} className="text-xs text-gray-600 hover:text-gray-300">Cancel</button>
                   </div>
                 </div>
               ) : (
@@ -2006,6 +2155,167 @@ export default function CharacterSheet({
           </div>
         </Section>
       )}
+
+      {/* ── Ritual Book Modal ── */}
+      {showRitualBook && (() => {
+        const ritualDiscs = character.disciplines.filter(cd => RITUAL_DISC_NAMES.includes(cd.discipline.name));
+        const learnedIds = new Set((character.rituals || []).map(cr => cr.ritual.id));
+        const discForBook = ritualDiscs.find(cd => cd.discipline.id === ritualBookDiscId);
+
+        // Filter rituals for this discipline only
+        console.log("ritualBook debug:", { allRitualsCount: allRituals.length, ritualBookDiscId, sample: allRituals[0] });
+        let filtered = allRituals.filter(r => r.discipline_id === ritualBookDiscId);
+        if (ritualSearch) filtered = filtered.filter(r =>
+          r.name.toLowerCase().includes(ritualSearch.toLowerCase()) ||
+          (r.description || "").toLowerCase().includes(ritualSearch.toLowerCase())
+        );
+        if (ritualLevelFilter.length > 0) filtered = filtered.filter(r => ritualLevelFilter.includes(r.level));
+
+        // Split into two pages — left: levels 1-3, right: levels 4-5 (or half-half)
+        const ITEMS_PER_PAGE = 6;
+        const totalPages = Math.ceil(filtered.length / (ITEMS_PER_PAGE * 2));
+        const pageStart = ritualPage * ITEMS_PER_PAGE * 2;
+        const leftPage  = filtered.slice(pageStart, pageStart + ITEMS_PER_PAGE);
+        const rightPage = filtered.slice(pageStart + ITEMS_PER_PAGE, pageStart + ITEMS_PER_PAGE * 2);
+
+        const discName = discForBook?.discipline.name ?? "";
+        const bookTitle = discName === "Oblivion" ? "Book of Night" : "Liber Sanguinis";
+
+        const RitualEntry = ({ r }) => {
+          const learned = learnedIds.has(r.id);
+          const canLearn = discForBook && discForBook.level >= r.level;
+          const alreadyHasLvl1 = r.level === 1 && (character.rituals || []).some(cr =>
+            cr.ritual.discipline_id === r.discipline_id && cr.ritual.level === 1
+          );
+          const xpCost = (r.level === 1 && !alreadyHasLvl1) ? 0 : r.level * 3;
+          const hasXp = freeEdit || availableXp >= xpCost;
+          const isExpanded = ritualInfoId === r.id;
+          return (
+            <div className={`mb-3 pb-3 border-b border-amber-900/20 last:border-0 ${learned ? "opacity-90" : ""}`}>
+              <div className="flex items-start gap-1.5">
+                <span className="text-amber-800 text-[10px] mt-0.5 shrink-0 w-10">{"●".repeat(r.level)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className={`text-sm font-gothic leading-tight ${learned ? "text-amber-600" : "text-amber-900"}`}>{r.name}</span>
+                    {learned && <span className="text-[10px] text-amber-700 italic">✓ known</span>}
+                  </div>
+                  {isExpanded && (
+                    <div className="mt-1 space-y-1">
+                      {r.description && <p className="text-amber-950/80 text-[11px] italic leading-snug">{r.description}</p>}
+                      {r.system_text && <p className="text-amber-900/70 text-[11px] leading-snug">{r.system_text}</p>}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => setRitualInfoId(isExpanded ? null : r.id)}
+                    className="text-amber-800/50 hover:text-amber-700 text-xs" title="Details">ℹ</button>
+                  {learned ? (
+                    (onImprove || freeEdit) && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await api.delete(`/api/characters/${character.id}/rituals/${r.id}`);
+                            if (onCharacterUpdate) onCharacterUpdate(res.data);
+                          } catch {}
+                        }}
+                        className="text-amber-900/40 hover:text-red-700 text-xs" title="Unlearn">✕</button>
+                    )
+                  ) : (
+                    <button
+                      disabled={!canLearn || !hasXp}
+                      onClick={async () => {
+                        setRitualError(null);
+                        try {
+                          const res = await api.post(`/api/characters/${character.id}/rituals/${r.id}`);
+                          if (onCharacterUpdate) onCharacterUpdate(res.data);
+                        } catch (e) { setRitualError(e.response?.data?.detail || "Failed."); }
+                      }}
+                      className="text-[10px] border border-amber-800/50 text-amber-800 hover:bg-amber-900/20 rounded px-1 py-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title={!canLearn ? `Need ${discName} level ${r.level}` : !hasXp ? `Need ${xpCost} XP` : ""}
+                    >{xpCost === 0 ? "Free" : `${xpCost}xp`}</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }}>
+            <div className="flex flex-col w-full max-w-4xl" onClick={e => e.stopPropagation()}>
+
+              {/* Book title */}
+              <h2 className="font-gothic text-center text-amber-600/80 tracking-[0.3em] uppercase text-sm mb-2">{bookTitle}</h2>
+
+              {/* Filter bar */}
+              <div className="flex gap-2 items-center mb-2 flex-wrap justify-center">
+                <input
+                  autoFocus
+                  value={ritualSearch}
+                  onChange={e => { setRitualSearch(e.target.value); setRitualPage(0); }}
+                  placeholder="Search…"
+                  className="bg-amber-950/60 border border-amber-800/40 text-amber-200 placeholder-amber-800/60 rounded px-3 py-1 text-sm w-44 focus:outline-none focus:border-amber-600"
+                />
+                <div className="flex gap-1">
+                  {[1,2,3,4,5].map(lvl => (
+                    <button key={lvl}
+                      onClick={() => {
+                        setRitualLevelFilter(prev => prev.includes(lvl) ? prev.filter(l => l !== lvl) : [...prev, lvl]);
+                        setRitualPage(0);
+                      }}
+                      className={`w-7 h-7 rounded text-xs font-gothic border transition-colors ${ritualLevelFilter.includes(lvl) ? "bg-amber-800 border-amber-600 text-amber-100" : "border-amber-900/40 text-amber-800/60 hover:border-amber-700"}`}
+                    >{lvl}</button>
+                  ))}
+                  {ritualLevelFilter.length > 0 && (
+                    <button onClick={() => setRitualLevelFilter([])} className="text-amber-800/50 hover:text-amber-600 text-xs px-1">✕</button>
+                  )}
+                </div>
+                <button onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }} className="ml-auto text-amber-800/50 hover:text-amber-400 text-lg leading-none">✕</button>
+              </div>
+
+              {/* Book spread */}
+              <div className="flex shadow-2xl" style={{ minHeight: "520px" }}>
+                {/* Left cover edge */}
+                <div className="w-4 rounded-l-sm" style={{ background: "linear-gradient(to right, #1a0a00, #3d1a00)" }} />
+                {/* Left page */}
+                <div className="flex-1 overflow-y-auto p-6" style={{ background: "linear-gradient(135deg, #f5e6c8 0%, #ede0b8 50%, #e8d8a8 100%)", borderRight: "2px solid #6b3a1f" }}>
+                  <p className="text-center text-amber-900/50 text-[10px] uppercase tracking-widest font-gothic mb-4 border-b border-amber-900/20 pb-2">
+                    {discName === "Oblivion" ? "Ceremonies of the Dead" : "Rites of Blood"}
+                  </p>
+                  {leftPage.length === 0 ? (
+                    <p className="text-amber-900/30 text-xs italic text-center mt-8">No entries.</p>
+                  ) : leftPage.map(r => <RitualEntry key={r.id} r={r} />)}
+                </div>
+                {/* Spine */}
+                <div className="w-6 flex items-center justify-center" style={{ background: "linear-gradient(to right, #3d1a00, #2a1000, #3d1a00)" }}>
+                  <span className="text-amber-900/30 text-[8px] tracking-widest" style={{ writingMode: "vertical-rl" }}>✦</span>
+                </div>
+                {/* Right page */}
+                <div className="flex-1 overflow-y-auto p-6" style={{ background: "linear-gradient(135deg, #e8d8a8 0%, #ede0b8 50%, #f5e6c8 100%)" }}>
+                  <p className="text-center text-amber-900/50 text-[10px] uppercase tracking-widest font-gothic mb-4 border-b border-amber-900/20 pb-2">
+                    {discName === "Oblivion" ? "Rites of Oblivion" : "Sorcerous Works"}
+                  </p>
+                  {rightPage.length === 0 ? (
+                    <p className="text-amber-900/30 text-xs italic text-center mt-8">{totalPages > 1 ? "End of page." : "No entries."}</p>
+                  ) : rightPage.map(r => <RitualEntry key={r.id} r={r} />)}
+                </div>
+                {/* Right cover edge */}
+                <div className="w-4 rounded-r-sm" style={{ background: "linear-gradient(to left, #1a0a00, #3d1a00)" }} />
+              </div>
+
+              {/* Page controls */}
+              <div className="flex items-center justify-center gap-4 mt-2">
+                <button disabled={ritualPage === 0} onClick={() => setRitualPage(p => p - 1)}
+                  className="text-amber-700/60 hover:text-amber-500 disabled:opacity-20 text-sm font-gothic tracking-widest">← Prev</button>
+                <span className="text-amber-800/50 text-xs font-gothic">{ritualPage + 1} / {Math.max(1, totalPages)}</span>
+                <button disabled={ritualPage >= totalPages - 1} onClick={() => setRitualPage(p => p + 1)}
+                  className="text-amber-700/60 hover:text-amber-500 disabled:opacity-20 text-sm font-gothic tracking-widest">Next →</button>
+              </div>
+              {ritualError && <p className="text-center text-red-400 text-xs mt-1">{ritualError}</p>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Remorse Roll Modal ── */}
       {showRemorse && (

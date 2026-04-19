@@ -87,3 +87,15 @@ class BackgroundOut(BaseModel):
     system_text: Optional[str]
     class Config:
         from_attributes = True
+
+
+class RitualOut(BaseModel):
+    id: int
+    discipline_id: int
+    discipline: Optional[DisciplineOut]
+    name: str
+    level: int
+    description: Optional[str]
+    system_text: Optional[str]
+    class Config:
+        from_attributes = True

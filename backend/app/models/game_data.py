@@ -100,3 +100,17 @@ class Background(Base):
     name = Column(String, unique=True, nullable=False)
     description = Column(Text)
     system_text = Column(Text)
+
+
+class Ritual(Base):
+    """Blood Sorcery rituals and Oblivion ceremonies — learned separately from discipline powers."""
+    __tablename__ = "rituals"
+
+    id = Column(Integer, primary_key=True)
+    discipline_id = Column(Integer, ForeignKey("disciplines.id"), nullable=False)
+    name = Column(String, nullable=False)
+    level = Column(Integer, nullable=False)   # 1–5
+    description = Column(Text)
+    system_text = Column(Text)
+
+    discipline = relationship("Discipline")

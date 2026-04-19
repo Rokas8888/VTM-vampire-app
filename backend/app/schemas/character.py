@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from app.models.character import CharacterStatus, Generation
-from app.schemas.game_data import ClanOut, PredatorTypeOut, DisciplineOut, DisciplineWithPowersOut, DisciplinePowerOut, MeritOut, FlawOut, BackgroundOut
+from app.schemas.game_data import ClanOut, PredatorTypeOut, DisciplineOut, DisciplineWithPowersOut, DisciplinePowerOut, MeritOut, FlawOut, BackgroundOut, RitualOut
 
 
 # ── Wizard step request bodies ──────────────────────────────────────────────
@@ -157,12 +157,17 @@ class Step10Data(BaseModel):
 
 class CharacterUpdateRequest(BaseModel):
     """Fields the player can edit after character creation."""
+    name: Optional[str] = None
+    concept: Optional[str] = None
     ambition: Optional[str] = None
     desire: Optional[str] = None
     biography: Optional[str] = None
     notes: Optional[str] = None
     haven_location: Optional[str] = None
     haven_description: Optional[str] = None
+    clan_id: Optional[int] = None
+    predator_type_id: Optional[int] = None
+    generation: Optional[str] = None
 
 
 class XPGrantRequest(BaseModel):
@@ -193,6 +198,7 @@ class ImproveRequest(BaseModel):
     discipline_id: Optional[int] = None  # for discipline (raise dot)
     power_id: Optional[int] = None       # for discipline_power (learn power)
     background_id: Optional[int] = None  # for background (raise dot)
+    free: bool = False                    # skip XP cost (for retainers)
 
 
 class MeritAddRequest(BaseModel):
@@ -357,6 +363,13 @@ class PossessionOut(BaseModel):
         from_attributes = True
 
 
+class CharacterRitualOut(BaseModel):
+    id: int
+    ritual: RitualOut
+    class Config:
+        from_attributes = True
+
+
 class CharacterSummaryOut(BaseModel):
     """Lightweight character info for the dashboard grid."""
     id: int
@@ -368,6 +381,9 @@ class CharacterSummaryOut(BaseModel):
     humanity: int
     total_xp: int
     spent_xp: int
+    is_retainer: bool = False
+    parent_character_id: Optional[int] = None
+    retainer_level: Optional[int] = None
     class Config:
         from_attributes = True
 
@@ -422,9 +438,11 @@ class CharacterOut(BaseModel):
     tenets: List[TenetOut] = []
     weapons: List[WeaponOut] = []
     possessions: List[PossessionOut] = []
+    rituals: List[CharacterRitualOut] = []
     temp_dots: Optional[Dict[str, Any]] = None
     is_retainer: bool = False
     parent_character_id: Optional[int] = None
+    retainer_level: Optional[int] = None
     retainers: List["CharacterOut"] = []
     class Config:
         from_attributes = True

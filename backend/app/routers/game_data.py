@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.database import get_db
-from app.models.game_data import Clan, Discipline, DisciplinePower, PredatorType, Merit, Flaw, Background
+from app.models.game_data import Clan, Discipline, DisciplinePower, PredatorType, Merit, Flaw, Background, Ritual
 from app.schemas.game_data import (
     ClanOut, DisciplineOut, DisciplineWithPowersOut, DisciplinePowerOut,
-    PredatorTypeOut, MeritOut, FlawOut, BackgroundOut
+    PredatorTypeOut, MeritOut, FlawOut, BackgroundOut, RitualOut
 )
 
 router = APIRouter(prefix="/api/game-data", tags=["game-data"])
@@ -49,3 +49,8 @@ def get_flaws(db: Session = Depends(get_db)):
 @router.get("/backgrounds", response_model=List[BackgroundOut])
 def get_backgrounds(db: Session = Depends(get_db)):
     return db.query(Background).order_by(Background.name).all()
+
+
+@router.get("/rituals", response_model=List[RitualOut])
+def get_rituals(db: Session = Depends(get_db)):
+    return db.query(Ritual).options(joinedload(Ritual.discipline)).order_by(Ritual.discipline_id, Ritual.level, Ritual.name).all()

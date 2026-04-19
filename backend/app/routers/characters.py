@@ -12,8 +12,9 @@ from app.models.character import (
     CharacterMerit, CharacterBackground, CharacterFlaw,
     CharacterWeapon, CharacterPossession,
     CharacterConviction, CharacterTenet,
+    CharacterRitual,
 )
-from app.models.game_data import Clan, Discipline, DisciplinePower
+from app.models.game_data import Clan, Discipline, DisciplinePower, Ritual
 from app.schemas.character import (
     DraftSaveRequest, DraftResponse, CharacterOut, CharacterSummaryOut, DirectoryCharOut,
     Step1Data, Step2Data, Step3Data, Step4Data, Step5Data,
@@ -70,6 +71,7 @@ def load_full_character(character_id: int, db: Session) -> Character:
         selectinload(Character.tenets),
         selectinload(Character.weapons),
         selectinload(Character.possessions),
+        selectinload(Character.rituals).joinedload(CharacterRitual.ritual).joinedload(Ritual.discipline),
         selectinload(Character.retainers),
     ).filter(Character.id == character_id).first()
     if char:
@@ -211,13 +213,24 @@ def complete_wizard(current_user: User = Depends(get_current_user), db: Session 
 # ── Character Endpoints ───────────────────────────────────────────────────────
 # NOTE: specific string paths (/mine) must come before the wildcard (/{id}).
 
+@router.get("/my-retainers", response_model=list[CharacterSummaryOut])
+def get_my_retainers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return all retainer characters belonging to the current player."""
+    return (
+        db.query(Character)
+        .options(joinedload(Character.clan))
+        .filter(Character.user_id == current_user.id, Character.is_retainer == True)
+        .all()
+    )
+
+
 @router.get("/mine", response_model=list[CharacterSummaryOut])
 def get_my_characters(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return all complete characters belonging to the current player."""
     return (
         db.query(Character)
         .options(joinedload(Character.clan))
-        .filter(Character.user_id == current_user.id, Character.status == CharacterStatus.complete)
+        .filter(Character.user_id == current_user.id, Character.status == CharacterStatus.complete, Character.is_retainer == False)
         .all()
     )
 
@@ -268,6 +281,17 @@ def update_character(
         char.haven_location = body.haven_location
     if body.haven_description is not None:
         char.haven_description = body.haven_description
+    if body.name is not None:
+        char.name = body.name
+    if body.concept is not None:
+        char.concept = body.concept
+    if body.clan_id is not None:
+        char.clan_id = body.clan_id
+    if body.predator_type_id is not None:
+        char.predator_type_id = body.predator_type_id
+    if body.generation is not None:
+        from app.models.character import Generation as Gen
+        char.generation = Gen(body.generation)
     db.commit()
     return load_full_character(char.id, db)
 
@@ -448,10 +472,11 @@ def improve_trait(
         if trait.value >= 5:
             raise HTTPException(status_code=400, detail="Already at maximum (5).")
         cost = (trait.value + 1) * 5
-        if cost > available_xp:
-            raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+        if not body.free:
+            if cost > available_xp:
+                raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+            char.spent_xp += cost
         trait.value += 1
-        char.spent_xp += cost
 
     elif body.trait_type == "skill":
         if body.trait_name not in ALL_VALID_SKILLS:
@@ -464,16 +489,18 @@ def improve_trait(
             if trait.value >= 5:
                 raise HTTPException(status_code=400, detail="Already at maximum (5).")
             cost = (trait.value + 1) * 3
-            if cost > available_xp:
-                raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+            if not body.free:
+                if cost > available_xp:
+                    raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+                char.spent_xp += cost
             trait.value += 1
         else:
-            # Skill at 0 — create the row with value 1
-            cost = 1 * 3  # new level 1 × 3
-            if cost > available_xp:
-                raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+            cost = 1 * 3
+            if not body.free:
+                if cost > available_xp:
+                    raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+                char.spent_xp += cost
             db.add(CharacterSkill(character_id=character_id, name=body.trait_name, value=1))
-        char.spent_xp += cost
 
     elif body.trait_type == "discipline":
         # Raise a discipline level by 1 dot.
@@ -485,10 +512,6 @@ def improve_trait(
             CharacterDiscipline.character_id == character_id,
             CharacterDiscipline.discipline_id == body.discipline_id,
         ).first()
-        if not char_disc:
-            raise HTTPException(status_code=404, detail="Discipline not found on character.")
-        if char_disc.level >= 5:
-            raise HTTPException(status_code=400, detail="Discipline already at maximum (5).")
         # Determine in-clan vs out-of-clan
         from sqlalchemy import and_
         from app.models.game_data import clan_disciplines as clan_disc_table
@@ -500,12 +523,30 @@ def improve_trait(
                 )
             )
         ).first() is not None
-        new_level = char_disc.level + 1
-        cost = new_level * (5 if is_in_clan else 7)
-        if cost > available_xp:
-            raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
-        char_disc.level += 1
-        char.spent_xp += cost
+        if not char_disc:
+            # New discipline — create at level 1
+            disc_obj = db.query(Discipline).filter(Discipline.id == body.discipline_id).first()
+            if not disc_obj:
+                raise HTTPException(status_code=404, detail="Discipline not found.")
+            cost = 1 * (5 if is_in_clan else 7)
+            if not body.free:
+                if cost > available_xp:
+                    raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+                char.spent_xp += cost
+            char_disc = CharacterDiscipline(character_id=character_id, discipline_id=body.discipline_id, level=1)
+            db.add(char_disc)
+            db.flush()
+            new_level = 1
+        else:
+            if char_disc.level >= 5:
+                raise HTTPException(status_code=400, detail="Discipline already at maximum (5).")
+            new_level = char_disc.level + 1
+            cost = new_level * (5 if is_in_clan else 7)
+            if not body.free:
+                if cost > available_xp:
+                    raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+                char.spent_xp += cost
+            char_disc.level += 1
         # Claim the free power included with this dot purchase
         if body.power_id:
             free_power = db.query(DisciplinePower).filter(DisciplinePower.id == body.power_id).first()
@@ -533,13 +574,22 @@ def improve_trait(
         if char_bg.level >= 5:
             raise HTTPException(status_code=400, detail="Background already at maximum (5).")
         cost = (char_bg.level + 1) * 3
-        if cost > available_xp:
-            raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+        if not body.free:
+            if cost > available_xp:
+                raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {available_xp}.")
+            char.spent_xp += cost
         char_bg.level += 1
-        char.spent_xp += cost
 
     else:
         raise HTTPException(status_code=400, detail="trait_type must be 'attribute', 'skill', 'discipline', or 'background'.")
+
+    # Recalculate health/willpower if relevant attribute changed
+    if body.trait_type == "attribute" and body.trait_name in ("Stamina", "Composure", "Resolve"):
+        attrs = {a.name: a.value for a in db.query(CharacterAttribute).filter(CharacterAttribute.character_id == character_id).all()}
+        if body.trait_name == "Stamina":
+            char.health = attrs.get("Stamina", 1) + 3
+        if body.trait_name in ("Composure", "Resolve"):
+            char.willpower = attrs.get("Composure", 1) + attrs.get("Resolve", 1)
 
     db.commit()
     return load_full_character(char.id, db)
@@ -659,6 +709,14 @@ def unimprove_trait(
 
     else:
         raise HTTPException(status_code=400, detail="trait_type must be 'attribute', 'skill', 'discipline', or 'background'.")
+
+    # Recalculate health/willpower if relevant attribute changed
+    if body.trait_type == "attribute" and body.trait_name in ("Stamina", "Composure", "Resolve"):
+        attrs = {a.name: a.value for a in db.query(CharacterAttribute).filter(CharacterAttribute.character_id == character_id).all()}
+        if body.trait_name == "Stamina":
+            char.health = attrs.get("Stamina", 1) + 3
+        if body.trait_name in ("Composure", "Resolve"):
+            char.willpower = attrs.get("Composure", 1) + attrs.get("Resolve", 1)
 
     db.commit()
     return load_full_character(char.id, db)
@@ -1151,6 +1209,7 @@ def set_temp_dots(
 class RetainerCreate(BaseModel):
     name: str
     concept: Optional[str] = None
+    retainer_level: Optional[int] = None
 
 @router.post("/{character_id}/retainers", response_model=CharacterOut, status_code=201)
 def create_retainer(
@@ -1171,12 +1230,16 @@ def create_retainer(
         concept=body.concept,
         is_retainer=True,
         parent_character_id=character_id,
+        retainer_level=body.retainer_level,
         status=CharacterStatus.complete,
         humanity=7,
         health=3,
         willpower=3,
     )
     db.add(retainer)
+    db.flush()  # get retainer.id before commit
+    for attr in ALL_VALID_ATTRIBUTES:
+        db.add(CharacterAttribute(character_id=retainer.id, name=attr, value=1))
     db.commit()
     return load_full_character(char.id, db)
 
@@ -1204,3 +1267,152 @@ def delete_retainer(
     db.delete(retainer)
     db.commit()
     return load_full_character(char.id, db)
+
+
+@router.post("/{character_id}/disciplines", response_model=CharacterOut, status_code=201)
+def add_discipline(
+    character_id: int,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a discipline at level 1 to a character (used for retainers)."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    discipline_id = body.get("discipline_id")
+    existing = db.query(CharacterDiscipline).filter(
+        CharacterDiscipline.character_id == character_id,
+        CharacterDiscipline.discipline_id == discipline_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Discipline already on character.")
+    db.add(CharacterDiscipline(character_id=character_id, discipline_id=discipline_id, level=1))
+    db.commit()
+    return load_full_character(character_id, db)
+
+
+@router.delete("/{character_id}/disciplines/{discipline_id}", response_model=CharacterOut)
+def remove_discipline(
+    character_id: int,
+    discipline_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a discipline from a character (used for retainers)."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    cd = db.query(CharacterDiscipline).filter(
+        CharacterDiscipline.character_id == character_id,
+        CharacterDiscipline.discipline_id == discipline_id,
+    ).first()
+    if not cd:
+        raise HTTPException(status_code=404, detail="Discipline not found.")
+    db.delete(cd)
+    db.commit()
+    return load_full_character(character_id, db)
+
+
+# ── Rituals ───────────────────────────────────────────────────────────────────
+
+@router.post("/{character_id}/rituals/{ritual_id}", response_model=CharacterOut)
+def learn_ritual(
+    character_id: int,
+    ritual_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Learn a ritual. XP cost = 3× ritual level. First level-1 ritual is free."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+
+    ritual = db.query(Ritual).filter(Ritual.id == ritual_id).first()
+    if not ritual:
+        raise HTTPException(status_code=404, detail="Ritual not found.")
+
+    # Character must have the discipline at a level ≥ ritual level
+    disc = db.query(CharacterDiscipline).filter(
+        CharacterDiscipline.character_id == character_id,
+        CharacterDiscipline.discipline_id == ritual.discipline_id,
+    ).first()
+    if not disc:
+        raise HTTPException(status_code=400, detail="Character does not have the required discipline.")
+    if disc.level < ritual.level:
+        raise HTTPException(status_code=400, detail=f"Requires {ritual.discipline.name} level {ritual.level}.")
+
+    # No duplicates
+    already = db.query(CharacterRitual).filter(
+        CharacterRitual.character_id == character_id,
+        CharacterRitual.ritual_id == ritual_id,
+    ).first()
+    if already:
+        raise HTTPException(status_code=400, detail="Ritual already learned.")
+
+    # XP cost: first level-1 ritual of this discipline is free, rest cost 3× level
+    known_rituals = db.query(CharacterRitual).join(Ritual).filter(
+        CharacterRitual.character_id == character_id,
+        Ritual.discipline_id == ritual.discipline_id,
+        Ritual.level == 1,
+    ).count()
+    is_free = (ritual.level == 1 and known_rituals == 0)
+    xp_cost = 0 if is_free else ritual.level * 3
+
+    if xp_cost > 0:
+        available_xp = char.total_xp - char.spent_xp
+        if available_xp < xp_cost:
+            raise HTTPException(status_code=400, detail=f"Not enough XP. Need {xp_cost}, have {available_xp}.")
+        char.spent_xp += xp_cost
+
+    db.add(CharacterRitual(character_id=character_id, ritual_id=ritual_id))
+    db.commit()
+    return load_full_character(character_id, db)
+
+
+@router.delete("/{character_id}/rituals/{ritual_id}", response_model=CharacterOut)
+def unlearn_ritual(
+    character_id: int,
+    ritual_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a learned ritual and refund XP."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+
+    ritual = db.query(Ritual).filter(Ritual.id == ritual_id).first()
+    if not ritual:
+        raise HTTPException(status_code=404, detail="Ritual not found.")
+
+    cr = db.query(CharacterRitual).filter(
+        CharacterRitual.character_id == character_id,
+        CharacterRitual.ritual_id == ritual_id,
+    ).first()
+    if not cr:
+        raise HTTPException(status_code=404, detail="Ritual not learned.")
+
+    # Refund XP (first level-1 ritual was free — check if there are others)
+    level1_known = db.query(CharacterRitual).join(Ritual).filter(
+        CharacterRitual.character_id == character_id,
+        Ritual.discipline_id == ritual.discipline_id,
+        Ritual.level == 1,
+        CharacterRitual.id != cr.id,
+    ).count()
+    was_free = (ritual.level == 1 and level1_known == 0)
+    xp_refund = 0 if was_free else ritual.level * 3
+
+    db.delete(cr)
+    if xp_refund > 0:
+        char.spent_xp = max(0, char.spent_xp - xp_refund)
+    db.commit()
+    return load_full_character(character_id, db)

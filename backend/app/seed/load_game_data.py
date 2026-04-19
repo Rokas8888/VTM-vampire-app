@@ -8,7 +8,7 @@ import json as _json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from app.database import SessionLocal
-from app.models.game_data import Clan, Discipline, DisciplinePower, PredatorType, Merit, Flaw, Background, clan_disciplines
+from app.models.game_data import Clan, Discipline, DisciplinePower, PredatorType, Merit, Flaw, Background, Ritual, clan_disciplines
 
 def seed(force: bool = False):
     db = SessionLocal()
@@ -25,6 +25,7 @@ def seed(force: bool = False):
             db.query(PredatorType).delete()
             db.query(Clan).delete()
             db.execute(clan_disciplines.delete())
+            db.query(Ritual).delete()
             db.query(DisciplinePower).delete()
             db.query(Discipline).delete()
             db.commit()
@@ -1022,6 +1023,142 @@ def seed(force: bool = False):
         ]
         for b in backgrounds:
             db.add(b)
+        db.flush()
+
+        print("Seeding rituals and ceremonies...")
+        # Look up discipline IDs for Blood Sorcery and Oblivion
+        bs_disc = db.query(Discipline).filter(Discipline.name == "Blood Sorcery").first()
+        ob_disc = db.query(Discipline).filter(Discipline.name == "Oblivion").first()
+
+        if bs_disc:
+            bs_rituals = [
+                # Level 1
+                Ritual(discipline=bs_disc, name="Blood Walk", level=1,
+                    description="The sorcerer traces the lineage of a Kindred through their vitae, learning their sire and clan.",
+                    system_text="One Rouse Check. Touch a drop of the target's blood and roll Intelligence + Blood Sorcery (Difficulty 3). Success reveals sire's name and clan. Extra successes reveal generation and lineage going back further."),
+                Ritual(discipline=bs_disc, name="Clinging of the Insect", level=1,
+                    description="The vampire anoints their hands and feet with vitae, granting them the ability to cling to walls and ceilings like a spider.",
+                    system_text="One Rouse Check. Costs one action to activate. The vampire can move on vertical and inverted surfaces at their normal speed for the rest of the scene. No roll required once active."),
+                Ritual(discipline=bs_disc, name="Craft Bloodstone", level=1,
+                    description="The sorcerer creates a pebble soaked in their vitae that acts as a supernatural tracking device.",
+                    system_text="One Rouse Check. Ritual takes one hour. The stone pings the sorcerer's senses when touched — roll Resolve + Blood Sorcery to sense who holds it and roughly where. Range: city-wide."),
+                Ritual(discipline=bs_disc, name="Wake with Evening's Freshness", level=1,
+                    description="The vampire prepares themselves before daysleep to awaken instantly at any sign of danger.",
+                    system_text="No Rouse Check. Performed before daysleep. The vampire wakes immediately upon hearing loud sounds, fire, or danger, and may act normally in the first turn of waking (ignoring usual sluggishness)."),
+                Ritual(discipline=bs_disc, name="Communicate with Kindred Sire", level=1,
+                    description="Through a brief ritual, the sorcerer sends a telepathic message to their sire, wherever they may be.",
+                    system_text="One Rouse Check. The message is limited to a single scene's worth of impressions and words. The sire receives it but need not respond. Roll Resolve + Blood Sorcery; difficulty depends on distance."),
+                Ritual(discipline=bs_disc, name="Dedicate the Childe", level=1,
+                    description="A protective ritual that marks a childe or target with the sorcerer's vitae, granting minor supernatural protection.",
+                    system_text="One Rouse Check. Ritual takes one hour. Target gains +1 die to resist supernatural coercion (Dominate, Presence) for one month. Must be renewed monthly."),
+                # Level 2
+                Ritual(discipline=bs_disc, name="Donning the Mask of Shadows", level=2,
+                    description="The vampire shrouds themselves in a veil of magical darkness, becoming nearly invisible to supernatural senses.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery (Difficulty 3). For the rest of the scene, the vampire is invisible to Auspex and similar detection powers unless the observer wins a contested roll."),
+                Ritual(discipline=bs_disc, name="Impressive Visage", level=2,
+                    description="The vampire channels Blood Sorcery into their appearance, temporarily improving their bearing and presence.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery. For the rest of the scene, add successes as bonus dice to Presence-based Social rolls. Maximum 3 bonus dice."),
+                Ritual(discipline=bs_disc, name="The Open Passage", level=2,
+                    description="The vampire anoints a door or barrier with vitae, causing it to open and remain open at their will.",
+                    system_text="One Rouse Check. Ritual takes one turn. Any mundane lock, bolt, or door opens without damage. Supernatural locks require a contested roll. The passage remains openable at will for one night."),
+                Ritual(discipline=bs_disc, name="Ward vs. Ghouls", level=2,
+                    description="The sorcerer inscribes a ward on a surface that burns ghouls who cross it.",
+                    system_text="One Rouse Check. Ritual takes one hour. Any ghoul crossing the ward takes 2 Aggravated damage (no soak). Ward lasts one month or until triggered three times."),
+                Ritual(discipline=bs_disc, name="Blood Witness", level=2,
+                    description="By tasting a drop of blood, the sorcerer witnesses the last scene the blood donor experienced before the blood was drawn.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery (Difficulty 3). Success shows the last hour of sensory experience. Messy Critical reveals deeper memories. Cannot be used on stale blood more than 24 hours old."),
+                # Level 3
+                Ritual(discipline=bs_disc, name="Bind the Accursed", level=3,
+                    description="The sorcerer weaves a blood oath into a physical object, compelling a target to follow its terms or suffer.",
+                    system_text="One Rouse Check. Ritual takes one night. Target must willingly touch the object and spill one drop of blood. If they break the oath's terms, they suffer a Compulsion each night until they make amends. Lasts until fulfilled or broken three times."),
+                Ritual(discipline=bs_disc, name="Firewalker", level=3,
+                    description="The vampire coats their body in their own vitae, granting temporary resistance to fire.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery (Difficulty 3). For the rest of the scene, reduce all fire damage by 2 (minimum 1). Aggravated fire damage is reduced by 1."),
+                Ritual(discipline=bs_disc, name="Flesh of Marble", level=3,
+                    description="The vampire hardens their skin to stone-like toughness through sustained ritual.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery. For the rest of the scene, gain Armor 2 against physical attacks. Aggravated damage reduced to Superficial if blocked."),
+                Ritual(discipline=bs_disc, name="Ward vs. Lupines", level=3,
+                    description="A more potent ward that repels and harms werewolves attempting to cross it.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. Werewolves crossing the ward take 3 Aggravated damage and are knocked back. Lasts one month or until triggered three times."),
+                Ritual(discipline=bs_disc, name="Pavis of Foul Presence", level=3,
+                    description="The sorcerer creates a mystic shield that reflects supernatural compulsions back at their source.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery (Difficulty 4). For the rest of the scene, when targeted by Dominate or Presence powers, roll contested. On success, the power rebounds — the user is affected by their own power."),
+                # Level 4
+                Ritual(discipline=bs_disc, name="Bone of Lies", level=4,
+                    description="The sorcerer enchants a mortal bone — often a finger — that compels truth from anyone who holds it.",
+                    system_text="Two Rouse Checks. Ritual takes one night. Anyone holding the bone cannot willingly lie. Each lie suppressed drains one dot of Resolve temporarily. The bone crumbles when it has suppressed a number of lies equal to 10 × the sorcerer's Blood Sorcery rating."),
+                Ritual(discipline=bs_disc, name="Shaft of Belated Dissolution", level=4,
+                    description="The sorcerer creates a wooden stake imbued with their vitae that dissolves into ash after striking a vampire.",
+                    system_text="Two Rouse Checks. Ritual takes one hour per stake. The stake stakes normally but dissolves after use, making it impossible to remove. Roll Intelligence + Blood Sorcery (Difficulty 4) to create; uses the vampire's full Blood Sorcery as its staking bonus dice."),
+                Ritual(discipline=bs_disc, name="Defense of the Sacred Haven", level=4,
+                    description="Powerful wards protect the sorcerer's haven from all supernatural intrusion.",
+                    system_text="Three Rouse Checks. Ritual takes one week. Any supernatural being entering the haven without permission loses all supernatural powers for the scene. Mortals are unaffected. The ward lasts one year."),
+                # Level 5
+                Ritual(discipline=bs_disc, name="Escape to a True Friend", level=5,
+                    description="In extremis, the sorcerer can teleport to the location of a blood-bonded ally anywhere in the city.",
+                    system_text="Three Rouse Checks. The sorcerer must have fed the ally their blood at least once. Roll Intelligence + Blood Sorcery (Difficulty 5). Success instantly transports the sorcerer to within 10 feet of the ally, regardless of physical barriers."),
+                Ritual(discipline=bs_disc, name="Raise the Dead", level=5,
+                    description="The ultimate Blood Sorcery ritual temporarily reanimates a corpse as a mindless servant.",
+                    system_text="Three Rouse Checks. Ritual takes one full night. The corpse rises as a zombie servant under the sorcerer's command. It has Physical attributes at half the corpse's living values, no mental or social traits, and crumbles to dust at sunrise."),
+                Ritual(discipline=bs_disc, name="Ward vs. Kindred", level=5,
+                    description="The most powerful ward, this ritual bars all vampires — including the Tremere — from crossing its boundary.",
+                    system_text="Three Rouse Checks. Ritual takes one night. Any vampire attempting to cross the ward takes 5 Aggravated damage and must win a Willpower roll (Difficulty 5) to pass. Lasts one year."),
+            ]
+            for r in bs_rituals:
+                db.add(r)
+
+        if ob_disc:
+            ob_ceremonies = [
+                # Level 1
+                Ritual(discipline=ob_disc, name="Ashes to Ashes", level=1,
+                    description="The necromancer speaks to the spirit of freshly dead, learning their final moments.",
+                    system_text="One Rouse Check. Must be performed within an hour of death. Roll Intelligence + Oblivion (Difficulty 3). Success lets the vampire ask three questions that the ghost answers truthfully (it can only relay what it knew in life)."),
+                Ritual(discipline=ob_disc, name="Binding Fetter", level=1,
+                    description="The vampire binds a ghost to a physical object, preventing it from wandering.",
+                    system_text="One Rouse Check. Contested roll: Intelligence + Oblivion vs. the ghost's Resolve. Success traps the ghost in a small object for one month or until the object is destroyed. The ghost can still speak."),
+                Ritual(discipline=ob_disc, name="Lay to Rest", level=1,
+                    description="The vampire performs funeral rites that put a restless spirit at peace, banishing it from the physical world.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion (Difficulty equal to the ghost's Resolve). Success sends the ghost to its final rest. It cannot return unless summoned by powerful necromancy."),
+                Ritual(discipline=ob_disc, name="Shadow Cloak", level=1,
+                    description="A brief ceremony that wraps the vampire in shadow, reducing their visual signature.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion (Difficulty 2). For the rest of the scene, add successes as bonus dice to Stealth rolls made in darkness or dim lighting. Maximum +3 dice."),
+                # Level 2
+                Ritual(discipline=ob_disc, name="Amercement of Ashes", level=2,
+                    description="The vampire calls a ghost back from wherever it fled and forces it to answer questions.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion contested by the ghost's Resolve. Success compels the ghost to appear and answer up to five questions honestly. It is hostile and will find loopholes if possible."),
+                Ritual(discipline=ob_disc, name="Awaken the Homuncular Servant", level=2,
+                    description="The necromancer animates a small creature made of grave-earth and bone as a spy and messenger.",
+                    system_text="One Rouse Check. Ritual takes one hour. Creates a palm-sized creature with basic animal intelligence. It can carry small objects, relay simple verbal messages, and spy. It lasts one week or until destroyed."),
+                Ritual(discipline=ob_disc, name="Grave's Decay", level=2,
+                    description="The vampire accelerates entropy in a target object, causing it to crumble and rust rapidly.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion vs. the object's structural rating (Storyteller determines). Success destroys objects up to the size of a door in one turn. Living targets are unaffected."),
+                # Level 3
+                Ritual(discipline=ob_disc, name="Summon the Haunting", level=3,
+                    description="The vampire calls poltergeist-level ghostly activity to a location, making it terrifying and difficult to inhabit.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Oblivion (Difficulty 4). For the rest of the night, the location is assailed by ghostly phenomena. Mortals must make Composure rolls or flee. Supernaturals suffer a 2-dice penalty to all actions."),
+                Ritual(discipline=ob_disc, name="Skuld Fulfilled", level=3,
+                    description="The vampire places a death-curse on a target, binding their fate to a specific condition.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. Specify a condition and a consequence. If the condition is triggered, the target suffers 2 Aggravated damage that night and each night for a week. Lasts until triggered or one year passes."),
+                Ritual(discipline=ob_disc, name="Whispers to the Dead", level=3,
+                    description="The vampire establishes a telepathic link with a ghost, communicating across vast distances.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Oblivion (Difficulty 3). For the rest of the scene, the vampire can communicate mentally with any ghost they have previously interacted with, regardless of distance."),
+                # Level 4
+                Ritual(discipline=ob_disc, name="Bastone Diabolico", level=4,
+                    description="The vampire enchants a wooden rod with death energy, creating a weapon that damages ghosts and spirits.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. The rod can strike and damage ghosts as if they were physical. It deals Aggravated damage to spirits. Lasts for one night."),
+                Ritual(discipline=ob_disc, name="Necrotic Plague", level=4,
+                    description="The vampire calls down a curse of decay on a community, causing illness, rot, and misfortune.",
+                    system_text="Three Rouse Checks. Ritual takes one night. Mortals in the area (city block) suffer one Aggravated damage per night and -1 to all rolls for one week. Animals die. Vegetation withers. Detectable as supernatural by those with Auspex."),
+                # Level 5
+                Ritual(discipline=ob_disc, name="Unearth Foe's Secrets", level=5,
+                    description="By communing with the Shadowlands, the vampire uncovers hidden truths about any target — their sins, lies, and vulnerabilities.",
+                    system_text="Three Rouse Checks. Ritual takes one full night. Roll Intelligence + Oblivion (Difficulty 5). Each success reveals one major secret the target holds — their greatest sin, their weakness, their hidden allies. The Storyteller reveals these one at a time."),
+                Ritual(discipline=ob_disc, name="Night Cry", level=5,
+                    description="The vampire unleashes a psychic death-wail that can kill mortals and send other vampires screaming into Frenzy.",
+                    system_text="Three Rouse Checks. Roll Resolve + Oblivion vs. targets' Composure + Resolve. Mortals who fail take Aggravated damage equal to the vampire's Oblivion rating. Vampires who fail enter immediate Frenzy. Affects everyone within earshot."),
+            ]
+            for c in ob_ceremonies:
+                db.add(c)
 
         db.commit()
         print("All game data seeded successfully!")
@@ -1034,6 +1171,155 @@ def seed(force: bool = False):
         db.close()
 
 
+def seed_rituals_only():
+    """Add ritual/ceremony rows without touching any other game data."""
+    db = SessionLocal()
+    try:
+        existing = db.query(Ritual).count()
+        if existing > 0:
+            print(f"Rituals already seeded ({existing} rows). Skipping.")
+            return
+
+        bs_disc = db.query(Discipline).filter(Discipline.name == "Blood Sorcery").first()
+        ob_disc = db.query(Discipline).filter(Discipline.name == "Oblivion").first()
+
+        if not bs_disc and not ob_disc:
+            print("Neither Blood Sorcery nor Oblivion discipline found. Run the full seed first.")
+            return
+
+        if bs_disc:
+            bs_rituals = [
+                Ritual(discipline=bs_disc, name="Blood Walk", level=1,
+                    description="The sorcerer traces the lineage of a Kindred through their vitae, learning their sire and clan.",
+                    system_text="One Rouse Check. Touch a drop of the target's blood and roll Intelligence + Blood Sorcery (Difficulty 3). Success reveals sire's name and clan. Extra successes reveal generation and lineage going back further."),
+                Ritual(discipline=bs_disc, name="Clinging of the Insect", level=1,
+                    description="The vampire anoints their hands and feet with vitae, granting them the ability to cling to walls and ceilings like a spider.",
+                    system_text="One Rouse Check. Costs one action to activate. The vampire can move on vertical and inverted surfaces at their normal speed for the rest of the scene. No roll required once active."),
+                Ritual(discipline=bs_disc, name="Craft Bloodstone", level=1,
+                    description="The sorcerer creates a pebble soaked in their vitae that acts as a supernatural tracking device.",
+                    system_text="One Rouse Check. Ritual takes one hour. The stone pings the sorcerer's senses when touched — roll Resolve + Blood Sorcery to sense who holds it and roughly where. Range: city-wide."),
+                Ritual(discipline=bs_disc, name="Wake with Evening's Freshness", level=1,
+                    description="The vampire prepares themselves before daysleep to awaken instantly at any sign of danger.",
+                    system_text="No Rouse Check. Performed before daysleep. The vampire wakes immediately upon hearing loud sounds, fire, or danger, and may act normally in the first turn of waking."),
+                Ritual(discipline=bs_disc, name="Communicate with Kindred Sire", level=1,
+                    description="Through a brief ritual, the sorcerer sends a telepathic message to their sire, wherever they may be.",
+                    system_text="One Rouse Check. The message is limited to a single scene's worth of impressions and words. The sire receives it but need not respond. Roll Resolve + Blood Sorcery; difficulty depends on distance."),
+                Ritual(discipline=bs_disc, name="Dedicate the Childe", level=1,
+                    description="A protective ritual that marks a childe or target with the sorcerer's vitae, granting minor supernatural protection.",
+                    system_text="One Rouse Check. Ritual takes one hour. Target gains +1 die to resist supernatural coercion (Dominate, Presence) for one month. Must be renewed monthly."),
+                Ritual(discipline=bs_disc, name="Donning the Mask of Shadows", level=2,
+                    description="The vampire shrouds themselves in a veil of magical darkness, becoming nearly invisible to supernatural senses.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery (Difficulty 3). For the rest of the scene, the vampire is invisible to Auspex and similar detection powers unless the observer wins a contested roll."),
+                Ritual(discipline=bs_disc, name="Impressive Visage", level=2,
+                    description="The vampire channels Blood Sorcery into their appearance, temporarily improving their bearing and presence.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery. For the rest of the scene, add successes as bonus dice to Presence-based Social rolls. Maximum 3 bonus dice."),
+                Ritual(discipline=bs_disc, name="The Open Passage", level=2,
+                    description="The vampire anoints a door or barrier with vitae, causing it to open and remain open at their will.",
+                    system_text="One Rouse Check. Ritual takes one turn. Any mundane lock, bolt, or door opens without damage. Supernatural locks require a contested roll. The passage remains openable at will for one night."),
+                Ritual(discipline=bs_disc, name="Ward vs. Ghouls", level=2,
+                    description="The sorcerer inscribes a ward on a surface that burns ghouls who cross it.",
+                    system_text="One Rouse Check. Ritual takes one hour. Any ghoul crossing the ward takes 2 Aggravated damage (no soak). Ward lasts one month or until triggered three times."),
+                Ritual(discipline=bs_disc, name="Blood Witness", level=2,
+                    description="By tasting a drop of blood, the sorcerer witnesses the last scene the blood donor experienced before the blood was drawn.",
+                    system_text="One Rouse Check. Roll Intelligence + Blood Sorcery (Difficulty 3). Success shows the last hour of sensory experience. Messy Critical reveals deeper memories. Cannot be used on stale blood more than 24 hours old."),
+                Ritual(discipline=bs_disc, name="Bind the Accursed", level=3,
+                    description="The sorcerer weaves a blood oath into a physical object, compelling a target to follow its terms or suffer.",
+                    system_text="One Rouse Check. Ritual takes one night. Target must willingly touch the object and spill one drop of blood. If they break the oath's terms, they suffer a Compulsion each night until they make amends."),
+                Ritual(discipline=bs_disc, name="Firewalker", level=3,
+                    description="The vampire coats their body in their own vitae, granting temporary resistance to fire.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery (Difficulty 3). For the rest of the scene, reduce all fire damage by 2 (minimum 1). Aggravated fire damage is reduced by 1."),
+                Ritual(discipline=bs_disc, name="Flesh of Marble", level=3,
+                    description="The vampire hardens their skin to stone-like toughness through sustained ritual.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery. For the rest of the scene, gain Armor 2 against physical attacks. Aggravated damage reduced to Superficial if blocked."),
+                Ritual(discipline=bs_disc, name="Ward vs. Lupines", level=3,
+                    description="A more potent ward that repels and harms werewolves attempting to cross it.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. Werewolves crossing the ward take 3 Aggravated damage and are knocked back. Lasts one month or until triggered three times."),
+                Ritual(discipline=bs_disc, name="Pavis of Foul Presence", level=3,
+                    description="The sorcerer creates a mystic shield that reflects supernatural compulsions back at their source.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Blood Sorcery (Difficulty 4). For the rest of the scene, when targeted by Dominate or Presence powers, roll contested. On success, the power rebounds on the user."),
+                Ritual(discipline=bs_disc, name="Bone of Lies", level=4,
+                    description="The sorcerer enchants a mortal bone that compels truth from anyone who holds it.",
+                    system_text="Two Rouse Checks. Ritual takes one night. Anyone holding the bone cannot willingly lie. Each lie suppressed drains one dot of Resolve temporarily."),
+                Ritual(discipline=bs_disc, name="Shaft of Belated Dissolution", level=4,
+                    description="The sorcerer creates a wooden stake imbued with their vitae that dissolves into ash after striking a vampire.",
+                    system_text="Two Rouse Checks. Ritual takes one hour per stake. The stake stakes normally but dissolves after use, making it impossible to remove."),
+                Ritual(discipline=bs_disc, name="Defense of the Sacred Haven", level=4,
+                    description="Powerful wards protect the sorcerer's haven from all supernatural intrusion.",
+                    system_text="Three Rouse Checks. Ritual takes one week. Any supernatural being entering the haven without permission loses all supernatural powers for the scene. The ward lasts one year."),
+                Ritual(discipline=bs_disc, name="Escape to a True Friend", level=5,
+                    description="In extremis, the sorcerer can teleport to the location of a blood-bonded ally anywhere in the city.",
+                    system_text="Three Rouse Checks. Roll Intelligence + Blood Sorcery (Difficulty 5). Success instantly transports the sorcerer to within 10 feet of the ally, regardless of physical barriers."),
+                Ritual(discipline=bs_disc, name="Raise the Dead", level=5,
+                    description="The ultimate Blood Sorcery ritual temporarily reanimates a corpse as a mindless servant.",
+                    system_text="Three Rouse Checks. Ritual takes one full night. The corpse rises as a zombie servant under the sorcerer's command. It crumbles to dust at sunrise."),
+                Ritual(discipline=bs_disc, name="Ward vs. Kindred", level=5,
+                    description="The most powerful ward, this ritual bars all vampires from crossing its boundary.",
+                    system_text="Three Rouse Checks. Ritual takes one night. Any vampire attempting to cross the ward takes 5 Aggravated damage and must win a Willpower roll (Difficulty 5) to pass. Lasts one year."),
+            ]
+            for r in bs_rituals:
+                db.add(r)
+
+        if ob_disc:
+            ob_ceremonies = [
+                Ritual(discipline=ob_disc, name="Ashes to Ashes", level=1,
+                    description="The necromancer speaks to the spirit of the freshly dead, learning their final moments.",
+                    system_text="One Rouse Check. Must be performed within an hour of death. Roll Intelligence + Oblivion (Difficulty 3). Success lets the vampire ask three questions the ghost answers truthfully."),
+                Ritual(discipline=ob_disc, name="Binding Fetter", level=1,
+                    description="The vampire binds a ghost to a physical object, preventing it from wandering.",
+                    system_text="One Rouse Check. Contested roll: Intelligence + Oblivion vs. the ghost's Resolve. Success traps the ghost in a small object for one month or until the object is destroyed."),
+                Ritual(discipline=ob_disc, name="Lay to Rest", level=1,
+                    description="The vampire performs funeral rites that put a restless spirit at peace, banishing it from the physical world.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion (Difficulty equal to the ghost's Resolve). Success sends the ghost to its final rest."),
+                Ritual(discipline=ob_disc, name="Shadow Cloak", level=1,
+                    description="A brief ceremony that wraps the vampire in shadow, reducing their visual signature.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion (Difficulty 2). For the rest of the scene, add successes as bonus dice to Stealth rolls in darkness or dim lighting. Maximum +3 dice."),
+                Ritual(discipline=ob_disc, name="Amercement of Ashes", level=2,
+                    description="The vampire calls a ghost back from wherever it fled and forces it to answer questions.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion contested by the ghost's Resolve. Success compels the ghost to appear and answer up to five questions honestly."),
+                Ritual(discipline=ob_disc, name="Awaken the Homuncular Servant", level=2,
+                    description="The necromancer animates a small creature made of grave-earth and bone as a spy and messenger.",
+                    system_text="One Rouse Check. Ritual takes one hour. Creates a palm-sized creature with basic animal intelligence. It can carry small objects and relay simple messages. Lasts one week."),
+                Ritual(discipline=ob_disc, name="Grave's Decay", level=2,
+                    description="The vampire accelerates entropy in a target object, causing it to crumble and rust rapidly.",
+                    system_text="One Rouse Check. Roll Intelligence + Oblivion vs. the object's structural rating. Success destroys objects up to the size of a door in one turn."),
+                Ritual(discipline=ob_disc, name="Summon the Haunting", level=3,
+                    description="The vampire calls poltergeist-level ghostly activity to a location, making it terrifying and difficult to inhabit.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Oblivion (Difficulty 4). For the rest of the night, mortals must make Composure rolls or flee. Supernaturals suffer a 2-dice penalty to all actions."),
+                Ritual(discipline=ob_disc, name="Skuld Fulfilled", level=3,
+                    description="The vampire places a death-curse on a target, binding their fate to a specific condition.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. Specify a condition and consequence. If triggered, the target suffers 2 Aggravated damage that night and each night for a week."),
+                Ritual(discipline=ob_disc, name="Whispers to the Dead", level=3,
+                    description="The vampire establishes a telepathic link with a ghost, communicating across vast distances.",
+                    system_text="Two Rouse Checks. Roll Intelligence + Oblivion (Difficulty 3). For the rest of the scene, the vampire can communicate mentally with any ghost they have previously interacted with."),
+                Ritual(discipline=ob_disc, name="Bastone Diabolico", level=4,
+                    description="The vampire enchants a wooden rod with death energy, creating a weapon that damages ghosts and spirits.",
+                    system_text="Two Rouse Checks. Ritual takes one hour. The rod can strike and damage ghosts as if they were physical, dealing Aggravated damage to spirits. Lasts for one night."),
+                Ritual(discipline=ob_disc, name="Necrotic Plague", level=4,
+                    description="The vampire calls down a curse of decay on a community, causing illness, rot, and misfortune.",
+                    system_text="Three Rouse Checks. Ritual takes one night. Mortals in the area suffer one Aggravated damage per night and -1 to all rolls for one week. Vegetation withers."),
+                Ritual(discipline=ob_disc, name="Unearth Foe's Secrets", level=5,
+                    description="By communing with the Shadowlands, the vampire uncovers hidden truths about any target.",
+                    system_text="Three Rouse Checks. Ritual takes one full night. Roll Intelligence + Oblivion (Difficulty 5). Each success reveals one major secret the target holds — their greatest sin, weakness, or hidden allies."),
+                Ritual(discipline=ob_disc, name="Night Cry", level=5,
+                    description="The vampire unleashes a psychic death-wail that can kill mortals and send vampires into Frenzy.",
+                    system_text="Three Rouse Checks. Roll Resolve + Oblivion vs. targets' Composure + Resolve. Mortals who fail take Aggravated damage equal to the vampire's Oblivion rating. Vampires who fail enter immediate Frenzy."),
+            ]
+            for c in ob_ceremonies:
+                db.add(c)
+
+        db.commit()
+        print(f"Seeded {db.query(Ritual).count()} rituals/ceremonies.")
+    except Exception as e:
+        db.rollback()
+        print(f"Error: {e}")
+        raise
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
-    force = "--force" in sys.argv or "-f" in sys.argv
-    seed(force=force)
+    if "--rituals-only" in sys.argv:
+        seed_rituals_only()
+    else:
+        force = "--force" in sys.argv or "-f" in sys.argv
+        seed(force=force)

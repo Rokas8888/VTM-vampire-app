@@ -67,6 +67,7 @@ class Character(Base):
     # Retainer support
     is_retainer = Column(Boolean, default=False, nullable=False, server_default="false")
     parent_character_id = Column(Integer, ForeignKey("characters.id"), nullable=True)
+    retainer_level = Column(Integer, nullable=True)  # which Retainer merit dot level this retainer represents
 
     # Temporary dots — blue overlay dots added during play (not permanent, not XP-spent)
     # Format: {"attributes": {"Strength": 1}, "skills": {"Brawl": 2}, "disciplines": {"5": {"dots": 1, "power_id": null}}}
@@ -93,6 +94,7 @@ class Character(Base):
     weapons = relationship("CharacterWeapon", back_populates="character", cascade="all, delete-orphan")
     possessions  = relationship("CharacterPossession", back_populates="character", cascade="all, delete-orphan")
     conditions   = relationship("Condition", back_populates="character", cascade="all, delete-orphan")
+    rituals      = relationship("CharacterRitual", back_populates="character", cascade="all, delete-orphan")
 
 
 class CharacterAttribute(Base):
@@ -212,6 +214,16 @@ class CharacterPossession(Base):
     name = Column(String, nullable=False)
     description = Column(Text)
     character = relationship("Character", back_populates="possessions")
+
+
+class CharacterRitual(Base):
+    """A ritual (Blood Sorcery) or ceremony (Oblivion) learned by a character."""
+    __tablename__ = "character_rituals"
+    id = Column(Integer, primary_key=True)
+    character_id = Column(Integer, ForeignKey("characters.id"), nullable=False)
+    ritual_id = Column(Integer, ForeignKey("rituals.id"), nullable=False)
+    character = relationship("Character", back_populates="rituals")
+    ritual = relationship("Ritual")
 
 
 class WizardDraft(Base):

@@ -18,29 +18,50 @@ const GENERATION_LABEL = {
 
 
 // ── Character Card ────────────────────────────────────────────────────────────
-function CharacterCard({ char, onOpen, onDelete }) {
+function CharacterCard({ char, onOpen, onDelete, isRetainer = false, ownerName = null, retainerLevel = null }) {
   return (
     <div
-      className="border border-void-border rounded-lg p-5 flex flex-col justify-between hover:border-blood/60 transition-colors"
-      style={{ minHeight: "260px", ...clanCardStyle(char.clan?.name) }}
+      className={`rounded-lg p-5 flex flex-col justify-between transition-colors ${
+        isRetainer
+          ? "border-2 border-blue-700/60 hover:border-blue-500/80 bg-blue-950/10"
+          : "border border-void-border hover:border-blood/60"
+      }`}
+      style={{ minHeight: "260px", ...(isRetainer ? {} : clanCardStyle(char.clan?.name)) }}
     >
       <div>
-        <h3 className="font-gothic text-xl text-blood mb-1 truncate">{char.name}</h3>
+        {isRetainer && (
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-blue-500 text-[10px] uppercase tracking-widest">Retainer</p>
+            {retainerLevel && (
+              <span className="text-blue-700 text-[10px]">{"●".repeat(retainerLevel)}</span>
+            )}
+          </div>
+        )}
+        <h3 className={`font-gothic text-xl mb-1 truncate ${isRetainer ? "text-blue-300" : "text-blood"}`}>{char.name}</h3>
         <p className="text-gray-500 text-xs mb-3">{char.concept}</p>
-        <p className="text-gray-400 text-sm">{char.clan?.name ?? "—"}</p>
-        <p className="text-gray-600 text-xs mt-1">{GENERATION_LABEL[char.generation] ?? "—"}</p>
+        {isRetainer && ownerName && (
+          <p className="text-gray-600 text-xs">Owner: <span className="text-gray-400">{ownerName}</span></p>
+        )}
+        {!isRetainer && <>
+          <p className="text-gray-400 text-sm">{char.clan?.name ?? "—"}</p>
+          <p className="text-gray-600 text-xs mt-1">{GENERATION_LABEL[char.generation] ?? "—"}</p>
+        </>}
       </div>
-      <div className="flex gap-4 my-4 text-xs text-gray-500">
-        <span>Humanity <span className="text-gray-300">{char.humanity}</span></span>
-        <span>BP <span className="text-gray-300">{char.blood_potency}</span></span>
-        <span>XP <span className="text-gray-300">{char.total_xp - char.spent_xp}</span></span>
-      </div>
-      <div className="flex gap-2">
-        <button onClick={() => onOpen(char.id)} className="vtm-btn flex-1 text-sm py-1">Open</button>
+      {!isRetainer && (
+        <div className="flex gap-4 my-4 text-xs text-gray-500">
+          <span>Humanity <span className="text-gray-300">{char.humanity}</span></span>
+          <span>BP <span className="text-gray-300">{char.blood_potency}</span></span>
+          <span>XP <span className="text-gray-300">{char.total_xp - char.spent_xp}</span></span>
+        </div>
+      )}
+      <div className="flex gap-2 mt-auto pt-3">
+        <button onClick={() => onOpen(char.id)} className={`flex-1 text-sm py-1 rounded border transition-colors ${isRetainer ? "border-blue-700 text-blue-300 hover:bg-blue-900/30" : "vtm-btn"}`}>
+          Open
+        </button>
         <button
           onClick={() => onDelete(char)}
           className="border border-void-border hover:border-blood text-gray-600 hover:text-blood rounded px-3 text-sm transition-colors"
-          title="Delete character"
+          title="Delete"
         >🗑</button>
       </div>
     </div>
@@ -72,6 +93,13 @@ export default function DashboardPage() {
 
   // character list
   const [characters, setCharacters] = useState([]);
+  const [retainerChars, setRetainerChars] = useState([]);
+  const [retainerParents, setRetainerParents] = useState({}); // id → full character (for merit level lookup)
+  const [retainerModal, setRetainerModal] = useState(null); // full retainer character object
+  const [retainerSheetEdit, setRetainerSheetEdit] = useState(false); // controls +/- buttons
+  const [retainerEditMode, setRetainerEditMode] = useState(false);
+  const [retainerEditForm, setRetainerEditForm] = useState({});
+  const [gameDataForRetainer, setGameDataForRetainer] = useState({ clans: [], predatorTypes: [] });
   const [loading, setLoading]       = useState(true);
 
   // detail view
@@ -133,6 +161,21 @@ export default function DashboardPage() {
     api.get("/api/characters/mine")
       .then((res) => { setCharacters(res.data); setLoading(false); })
       .catch(() => setLoading(false));
+    api.get("/api/characters/my-retainers")
+      .then(async (res) => {
+        setRetainerChars(res.data);
+        // Fetch parent characters to get Retainer merit levels
+        const parentIds = [...new Set(res.data.map((r) => r.parent_character_id).filter(Boolean))];
+        const parents = {};
+        await Promise.all(parentIds.map(async (pid) => {
+          try {
+            const r = await api.get(`/api/characters/${pid}`);
+            parents[pid] = r.data;
+          } catch {}
+        }));
+        setRetainerParents(parents);
+      })
+      .catch(() => {});
     api.get("/api/groups/mine")
       .then((res) => setMyGroups(res.data))
       .catch(() => {});
@@ -256,6 +299,7 @@ export default function DashboardPage() {
         trait_type: traitType,
         trait_name: traitName || undefined,
         ...extra,
+        free: selected.is_retainer || false,
       });
       setSelected(res.data);
       setCharacters((prev) => prev.map((c) =>
@@ -316,6 +360,7 @@ export default function DashboardPage() {
     try {
       await api.delete(`/api/characters/${deleteTarget.id}`);
       setCharacters((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setRetainerChars((prev) => prev.filter((c) => c.id !== deleteTarget.id));
       // If the deleted character was open, close detail view
       if (selected?.id === deleteTarget.id) closeDetail();
       setDeleteTarget(null);
@@ -329,6 +374,7 @@ export default function DashboardPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
+    <>
     <div
       className="min-h-screen text-gray-200"
       style={selected
@@ -397,11 +443,13 @@ export default function DashboardPage() {
 
             <div className="h-4 border-l border-void-border mr-3" />
 
-            {/* XP counter */}
-            <span className="text-xs text-gray-500 mr-1">
-              XP: <span className="text-blood font-bold">{availableXp}</span>
-              <span className="text-gray-700"> / {selected.total_xp}</span>
-            </span>
+            {/* XP counter — hidden for retainers */}
+            {!selected.is_retainer && (
+              <span className="text-xs text-gray-500 mr-1">
+                XP: <span className="text-blood font-bold">{availableXp}</span>
+                <span className="text-gray-700"> / {selected.total_xp}</span>
+              </span>
+            )}
 
             {/* Dice Roller */}
             <button
@@ -418,35 +466,32 @@ export default function DashboardPage() {
 
             <div className="h-4 border-l border-void-border mx-1" />
 
-            {/* XP (add / remove) */}
-            <button
-              onClick={() => { openPanel("xp"); setXpMode("add"); }}
-              className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                activePanel === "xp"
-                  ? "border-blood text-blood bg-blood-dark/20"
-                  : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-              }`}
-              title="Add or remove experience points"
-            >
-              XP
-            </button>
+            {/* XP + Improve — hidden for retainers */}
+            {!selected.is_retainer && <>
+              <button
+                onClick={() => { openPanel("xp"); setXpMode("add"); }}
+                className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
+                  activePanel === "xp"
+                    ? "border-blood text-blood bg-blood-dark/20"
+                    : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                }`}
+                title="Add or remove experience points"
+              >XP</button>
 
-            <div className="h-4 border-l border-void-border mx-1" />
+              <div className="h-4 border-l border-void-border mx-1" />
 
-            {/* Improve Stats */}
-            <button
-              onClick={() => { setImproveMode(!improveMode); setImproveError(null); closePanel(); setTempMode(false); }}
-              className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                improveMode
-                  ? "border-blood text-blood bg-blood-dark/20"
-                  : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-              }`}
-              title="Spend XP to raise attributes and skills"
-            >
-              {improveMode ? "✓ Improving…" : "Improve Stats"}
-            </button>
+              <button
+                onClick={() => { setImproveMode(!improveMode); setImproveError(null); closePanel(); setTempMode(false); }}
+                className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
+                  improveMode
+                    ? "border-blood text-blood bg-blood-dark/20"
+                    : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                }`}
+                title="Spend XP to raise attributes and skills"
+              >{improveMode ? "✓ Improving…" : "Improve Stats"}</button>
 
-            <div className="h-4 border-l border-void-border mx-1" />
+              <div className="h-4 border-l border-void-border mx-1" />
+            </>}
 
             {/* Temporary Dots */}
             <button
@@ -668,8 +713,9 @@ export default function DashboardPage() {
           /* ── Character sheet ── */
           <CharacterSheet
             character={selected}
-            onImprove={improveMode ? handleImprove : undefined}
-            onUnimprove={improveMode ? handleUnimprove : undefined}
+            onImprove={selected.is_retainer ? handleImprove : (improveMode ? handleImprove : undefined)}
+            onUnimprove={selected.is_retainer ? handleUnimprove : (improveMode ? handleUnimprove : undefined)}
+            freeEdit={selected.is_retainer}
             tempMode={tempMode}
             onSetTempDots={handleSetTempDots}
             onSaveSession={handleSaveSession}
@@ -683,6 +729,16 @@ export default function DashboardPage() {
               setCharacters((prev) => prev.map((c) =>
                 c.id === updated.id ? { ...c, total_xp: updated.total_xp, spent_xp: updated.spent_xp } : c
               ));
+            }}
+            onOpenRetainer={async (id) => {
+              const [charRes, clansRes, predRes] = await Promise.all([
+                api.get(`/api/characters/${id}`),
+                api.get("/api/game-data/clans"),
+                api.get("/api/game-data/predator-types"),
+              ]);
+              setRetainerModal(charRes.data);
+              setRetainerEditMode(false);
+              setGameDataForRetainer({ clans: clansRes.data, predatorTypes: predRes.data });
             }}
             onClaimFreePower={async (powerId) => {
               try {
@@ -711,6 +767,30 @@ export default function DashboardPage() {
                   onDelete={(c) => { setDeleteTarget(c); setDeleteText(""); }}
                 />
               ))}
+              {retainerChars.map((r) => {
+                const owner = retainerParents[r.parent_character_id];
+                return (
+                  <CharacterCard
+                    key={`retainer-${r.id}`}
+                    char={r}
+                    isRetainer
+                    ownerName={owner?.name ?? null}
+                    retainerLevel={r.retainer_level ?? null}
+                    onOpen={async (id) => {
+                      const [charRes, clansRes, predRes] = await Promise.all([
+                        api.get(`/api/characters/${id}`),
+                        api.get("/api/game-data/clans"),
+                        api.get("/api/game-data/predator-types"),
+                      ]);
+                      setRetainerModal(charRes.data);
+                      setRetainerSheetEdit(false);
+                      setRetainerEditMode(false);
+                      setGameDataForRetainer({ clans: clansRes.data, predatorTypes: predRes.data });
+                    }}
+                    onDelete={(c) => { setDeleteTarget(c); setDeleteText(""); }}
+                  />
+                );
+              })}
               <NewCharacterCard onClick={async () => { await resetDraft(); navigate("/wizard", { state: { isNew: true } }); }} />
             </div>
           </div>
@@ -718,5 +798,98 @@ export default function DashboardPage() {
 
       </div>
     </div>
+
+    {/* ── Retainer Modal ── */}
+    {retainerModal && (
+      <div className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setRetainerModal(null)}>
+        <div className="relative w-full max-w-5xl my-8 border-2 border-blue-700 rounded-xl bg-gray-950" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-6 py-3 border-b border-blue-800/50">
+            <p className="font-gothic text-blue-300 tracking-widest uppercase text-sm">Retainer — {retainerModal.name}</p>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setRetainerSheetEdit((v) => !v)}
+                className={`text-xs border rounded px-2 py-1 transition-colors ${retainerSheetEdit ? "border-blood text-blood" : "border-blue-800 text-blue-400 hover:text-blue-200"}`}
+              >{retainerSheetEdit ? "✓ Done Editing" : "Edit Stats"}</button>
+              <button
+                onClick={() => { setRetainerEditMode((v) => !v); setRetainerEditForm({ name: retainerModal.name, concept: retainerModal.concept || "", ambition: retainerModal.ambition || "", desire: retainerModal.desire || "", clan_id: retainerModal.clan?.id || "", predator_type_id: retainerModal.predator_type?.id || "", generation: retainerModal.generation || "" }); }}
+                className="text-xs border border-blue-800 text-blue-400 hover:text-blue-200 rounded px-2 py-1 transition-colors"
+              >{retainerEditMode ? "✕ Cancel" : "Edit Info"}</button>
+              <button onClick={() => setRetainerModal(null)} className="text-gray-600 hover:text-gray-300 text-lg">✕</button>
+            </div>
+          </div>
+
+          {retainerEditMode && (
+            <div className="px-6 py-4 border-b border-blue-800/30 bg-blue-950/20 grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[["Name", "name"], ["Concept", "concept"], ["Ambition", "ambition"], ["Desire", "desire"]].map(([label, key]) => (
+                <div key={key}>
+                  <p className="text-xs text-gray-500 mb-1">{label}</p>
+                  <input value={retainerEditForm[key] || ""} onChange={(e) => setRetainerEditForm((f) => ({ ...f, [key]: e.target.value }))} className="vtm-input text-sm w-full" />
+                </div>
+              ))}
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Clan</p>
+                <select value={retainerEditForm.clan_id || ""} onChange={(e) => setRetainerEditForm((f) => ({ ...f, clan_id: e.target.value }))} className="vtm-input text-sm w-full">
+                  <option value="">— None —</option>
+                  {gameDataForRetainer.clans.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Predator Type</p>
+                <select value={retainerEditForm.predator_type_id || ""} onChange={(e) => setRetainerEditForm((f) => ({ ...f, predator_type_id: e.target.value }))} className="vtm-input text-sm w-full">
+                  <option value="">— None —</option>
+                  {gameDataForRetainer.predatorTypes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Generation</p>
+                <select value={retainerEditForm.generation || ""} onChange={(e) => setRetainerEditForm((f) => ({ ...f, generation: e.target.value }))} className="vtm-input text-sm w-full">
+                  <option value="">— None —</option>
+                  <option value="childer">Childer (13th)</option>
+                  <option value="neonate">Neonate (12th)</option>
+                  <option value="ancillae">Ancillae (11th)</option>
+                </select>
+              </div>
+              <div className="col-span-full flex justify-end mt-1">
+                <button
+                  onClick={async () => {
+                    const body = { name: retainerEditForm.name, concept: retainerEditForm.concept || null, ambition: retainerEditForm.ambition || null, desire: retainerEditForm.desire || null, clan_id: retainerEditForm.clan_id ? Number(retainerEditForm.clan_id) : null, predator_type_id: retainerEditForm.predator_type_id ? Number(retainerEditForm.predator_type_id) : null, generation: retainerEditForm.generation || null };
+                    const res = await api.put(`/api/characters/${retainerModal.id}`, body);
+                    setRetainerModal(res.data);
+                    setRetainerEditMode(false);
+                  }}
+                  className="vtm-btn text-sm py-1 px-4"
+                >Save</button>
+              </div>
+            </div>
+          )}
+          <div className="p-6">
+            <CharacterSheet
+              character={retainerModal}
+              freeEdit
+              onImprove={retainerSheetEdit ? async (traitType, traitName, extra = {}) => {
+                const res = await api.post(`/api/characters/${retainerModal.id}/improve`, { trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true });
+                setRetainerModal(res.data);
+              } : undefined}
+              onUnimprove={retainerSheetEdit ? async (traitType, traitName, extra = {}) => {
+                const res = await api.post(`/api/characters/${retainerModal.id}/unimprove`, { trait_type: traitType, trait_name: traitName || undefined, ...extra });
+                setRetainerModal(res.data);
+              } : undefined}
+              onCharacterUpdate={(updated) => setRetainerModal(updated)}
+              onClaimFreePower={async (powerId) => {
+                try {
+                  const res = await api.post(`/api/characters/${retainerModal.id}/claim-predator-power`, { power_id: powerId });
+                  setRetainerModal(res.data);
+                } catch (e) { console.error("Failed to claim power", e); }
+              }}
+              onAddWeapon={async (w) => { const res = await api.post(`/api/characters/${retainerModal.id}/weapons`, w); setRetainerModal(res.data); }}
+              onDeleteWeapon={async (id) => { const res = await api.delete(`/api/characters/${retainerModal.id}/weapons/${id}`); setRetainerModal(res.data); }}
+              onAddPossession={async (p) => { const res = await api.post(`/api/characters/${retainerModal.id}/possessions`, p); setRetainerModal(res.data); }}
+              onDeletePossession={async (id) => { const res = await api.delete(`/api/characters/${retainerModal.id}/possessions/${id}`); setRetainerModal(res.data); }}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
