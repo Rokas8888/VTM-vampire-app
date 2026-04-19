@@ -643,6 +643,13 @@ export default function CharacterSheet({
   const [autoSaveStatus,  setAutoSaveStatus]  = useState(null); // null | "saving" | "saved"
   const autoSaveTimer = useRef(null);
 
+  // Retainers
+  const [showRetainerForm, setShowRetainerForm] = useState(false);
+  const [retainerName, setRetainerName] = useState("");
+  const [retainerConcept, setRetainerConcept] = useState("");
+  const [retainerSaving, setRetainerSaving] = useState(false);
+  const retainerMeritCount = character.merits.filter(m => m.merit.name.toLowerCase().includes("retainer")).length;
+
   // Portrait upload
   const [portraitUrl, setPortraitUrl] = useState(character.portrait_url || null);
   const [portraitUploading, setPortraitUploading] = useState(false);
@@ -1272,7 +1279,7 @@ export default function CharacterSheet({
                             <button
                               onClick={async () => {
                                 try {
-                                  const res = await api.delete(`/api/characters/${character.id}/merits/${cm.merit.id}`);
+                                  const res = await api.delete(`/api/characters/${character.id}/merits/${cm.merit.id}?level=${cm.level}`);
                                   if (onCharacterUpdate) onCharacterUpdate(res.data);
                                 } catch (e) { console.error(e); }
                               }}
@@ -1929,6 +1936,76 @@ export default function CharacterSheet({
           )}
         </div>
       </Section>
+
+      {/* ── Retainers ── */}
+      {retainerMeritCount > 0 && (
+        <Section title="Retainers">
+          <div className="space-y-3">
+            {(character.retainers || []).map((r) => (
+              <div key={r.id} className="border-2 border-blue-800/60 rounded-lg p-4 bg-blue-950/10 flex justify-between items-start">
+                <div>
+                  <p className="font-gothic text-blue-300 text-lg">{r.name}</p>
+                  {r.concept && <p className="text-gray-500 text-xs">{r.concept}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.open(`/retainer/${r.id}`, "_blank")}
+                    className="text-xs text-blue-400 hover:text-blue-200 border border-blue-800 rounded px-2 py-1 transition-colors"
+                  >View Sheet</button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Delete retainer ${r.name}?`)) return;
+                      const res = await api.delete(`/api/characters/${character.id}/retainers/${r.id}`);
+                      if (onCharacterUpdate) onCharacterUpdate(res.data);
+                    }}
+                    className="text-xs text-gray-700 hover:text-blood transition-colors"
+                  >✕</button>
+                </div>
+              </div>
+            ))}
+
+            {(character.retainers || []).length < retainerMeritCount && (
+              showRetainerForm ? (
+                <div className="border border-blue-800/40 rounded-lg p-4 space-y-3 bg-void">
+                  <input
+                    autoFocus
+                    value={retainerName}
+                    onChange={(e) => setRetainerName(e.target.value)}
+                    placeholder="Retainer name…"
+                    className="vtm-input text-sm w-full"
+                  />
+                  <input
+                    value={retainerConcept}
+                    onChange={(e) => setRetainerConcept(e.target.value)}
+                    placeholder="Concept (human, ghoul, etc.)…"
+                    className="vtm-input text-sm w-full"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      disabled={!retainerName || retainerSaving}
+                      onClick={async () => {
+                        setRetainerSaving(true);
+                        try {
+                          const res = await api.post(`/api/characters/${character.id}/retainers`, { name: retainerName, concept: retainerConcept || null });
+                          if (onCharacterUpdate) onCharacterUpdate(res.data);
+                          setShowRetainerForm(false); setRetainerName(""); setRetainerConcept("");
+                        } finally { setRetainerSaving(false); }
+                      }}
+                      className="vtm-btn py-1 px-4 text-sm disabled:opacity-40"
+                    >{retainerSaving ? "Creating…" : "Create Retainer"}</button>
+                    <button onClick={() => setShowRetainerForm(false)} className="text-xs text-gray-600 hover:text-gray-300">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowRetainerForm(true)}
+                  className="text-xs text-blue-500 hover:text-blue-300 transition-colors font-gothic tracking-wider"
+                >+ Add Retainer ({(character.retainers || []).length}/{retainerMeritCount})</button>
+              )
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* ── Remorse Roll Modal ── */}
       {showRemorse && (

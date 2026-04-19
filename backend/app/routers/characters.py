@@ -1,3 +1,5 @@
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload, selectinload
 from app.database import get_db
@@ -68,6 +70,7 @@ def load_full_character(character_id: int, db: Session) -> Character:
         selectinload(Character.tenets),
         selectinload(Character.weapons),
         selectinload(Character.possessions),
+        selectinload(Character.retainers),
     ).filter(Character.id == character_id).first()
     if char:
         _apply_passive_discipline_effects(char)
@@ -878,9 +881,10 @@ def add_merit(
     existing = db.query(CharacterMerit).filter(
         CharacterMerit.character_id == character_id,
         CharacterMerit.merit_id == body.merit_id,
+        CharacterMerit.level == body.level,
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Merit already on character.")
+        raise HTTPException(status_code=400, detail="Merit at this level already on character.")
     db.add(CharacterMerit(character_id=character_id, merit_id=body.merit_id, level=body.level))
     db.commit()
     return load_full_character(char.id, db)
@@ -890,6 +894,7 @@ def add_merit(
 def remove_merit(
     character_id: int,
     merit_id: int,
+    level: int = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -899,10 +904,13 @@ def remove_merit(
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
-    cm = db.query(CharacterMerit).filter(
+    q = db.query(CharacterMerit).filter(
         CharacterMerit.character_id == character_id,
         CharacterMerit.merit_id == merit_id,
-    ).first()
+    )
+    if level is not None:
+        q = q.filter(CharacterMerit.level == level)
+    cm = q.first()
     if not cm:
         raise HTTPException(status_code=404, detail="Merit not on character.")
     db.delete(cm)
@@ -1134,5 +1142,65 @@ def set_temp_dots(
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     char.temp_dots = body.temp_dots
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+# ── Retainers ─────────────────────────────────────────────────────────────────
+
+class RetainerCreate(BaseModel):
+    name: str
+    concept: Optional[str] = None
+
+@router.post("/{character_id}/retainers", response_model=CharacterOut, status_code=201)
+def create_retainer(
+    character_id: int,
+    body: RetainerCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a retainer linked to a character."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    retainer = Character(
+        user_id=current_user.id,
+        name=body.name,
+        concept=body.concept,
+        is_retainer=True,
+        parent_character_id=character_id,
+        status=CharacterStatus.complete,
+        humanity=7,
+        health=3,
+        willpower=3,
+    )
+    db.add(retainer)
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.delete("/{character_id}/retainers/{retainer_id}", response_model=CharacterOut)
+def delete_retainer(
+    character_id: int,
+    retainer_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a retainer."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    retainer = db.query(Character).filter(
+        Character.id == retainer_id,
+        Character.parent_character_id == character_id,
+        Character.is_retainer == True,
+    ).first()
+    if not retainer:
+        raise HTTPException(status_code=404, detail="Retainer not found.")
+    db.delete(retainer)
     db.commit()
     return load_full_character(char.id, db)

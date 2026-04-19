@@ -423,5 +423,8 @@ class CharacterOut(BaseModel):
     weapons: List[WeaponOut] = []
     possessions: List[PossessionOut] = []
     temp_dots: Optional[Dict[str, Any]] = None
+    is_retainer: bool = False
+    parent_character_id: Optional[int] = None
+    retainers: List["CharacterOut"] = []
     class Config:
         from_attributes = True

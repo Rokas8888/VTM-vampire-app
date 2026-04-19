@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Enum, JSON
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Enum, JSON, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -64,6 +64,10 @@ class Character(Base):
     haven_description = Column(Text)
     portrait_url = Column(String, nullable=True)
 
+    # Retainer support
+    is_retainer = Column(Boolean, default=False, nullable=False, server_default="false")
+    parent_character_id = Column(Integer, ForeignKey("characters.id"), nullable=True)
+
     # Temporary dots — blue overlay dots added during play (not permanent, not XP-spent)
     # Format: {"attributes": {"Strength": 1}, "skills": {"Brawl": 2}, "disciplines": {"5": {"dots": 1, "power_id": null}}}
     temp_dots = Column(JSON, nullable=True)
@@ -72,6 +76,8 @@ class Character(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    retainers = relationship("Character", foreign_keys="Character.parent_character_id", back_populates="parent_character")
+    parent_character = relationship("Character", foreign_keys="[Character.parent_character_id]", back_populates="retainers", remote_side="Character.id")
     clan = relationship("Clan")
     predator_type = relationship("PredatorType")
     attributes = relationship("CharacterAttribute", back_populates="character", cascade="all, delete-orphan")
