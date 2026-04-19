@@ -67,16 +67,22 @@ function GMCharCard({ char, onClick, onRemove }) {
   const [powerPopup, setPowerPopup]     = useState(null); // power object for info popup
   const [notesOpen, setNotesOpen]       = useState(false);
 
+  const isRetainer = !!char.is_retainer;
+
   return (
     <div
-      className="group relative border border-void-border rounded-lg p-4 flex flex-col gap-3 hover:border-blood/60 transition-colors"
-      style={clanCardStyle(char.clan_name)}
+      className={`group relative border rounded-lg p-4 flex flex-col gap-3 transition-colors ${
+        isRetainer
+          ? "border-blue-700/60 hover:border-blue-500/80 bg-blue-950/10"
+          : "border-void-border hover:border-blood/60"
+      }`}
+      style={isRetainer ? {} : clanCardStyle(char.clan_name)}
     >
       {/* Clickable overlay for opening sheet — excludes discipline area */}
       <div className="absolute inset-0 cursor-pointer" onClick={onClick} />
 
-      {/* Remove button — top-right, revealed on hover */}
-      {onRemove && (
+      {/* Remove button — top-right, revealed on hover — only for non-retainers */}
+      {onRemove && !isRetainer && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(char.user_id); }}
           title={`Remove ${char.username ?? "player"} from group`}
@@ -84,8 +90,19 @@ function GMCharCard({ char, onClick, onRemove }) {
         >✕</button>
       )}
       <div>
-        <h3 className="font-gothic text-blood text-lg leading-tight truncate">{char.name}</h3>
-        <p className="text-gray-400 text-xs">{char.clan_name ?? "—"} · {GENERATION_SHORT[char.generation] ?? "—"} Gen</p>
+        {isRetainer && (
+          <p className="text-blue-600 text-[10px] uppercase tracking-widest font-gothic mb-0.5">
+            Retainer{char.parent_name ? ` of ${char.parent_name}` : ""}
+          </p>
+        )}
+        <h3 className={`font-gothic text-lg leading-tight truncate ${isRetainer ? "text-blue-300" : "text-blood"}`}>
+          {char.name}
+        </h3>
+        <p className="text-gray-400 text-xs">
+          {isRetainer
+            ? (char.concept ?? "Retainer")
+            : `${char.clan_name ?? "—"} · ${GENERATION_SHORT[char.generation] ?? "—"} Gen`}
+        </p>
       </div>
 
       {/* BP + Humanity as dot trackers */}
@@ -574,10 +591,24 @@ export default function GMDashboardPage() {
       .catch(() => setLoadingChar(false));
   };
 
-  // ── Flatten all characters for grid (attach user_id/username for remove) ──
+  // ── Flatten all characters + retainers for grid ──────────────────────────
   const allChars = selectedGroup
     ? selectedGroup.members.flatMap((m) =>
-        m.characters.map((c) => ({ ...c, user_id: m.user_id, username: m.username }))
+        m.characters.flatMap((c) => [
+          { ...c, user_id: m.user_id, username: m.username },
+          ...(c.retainers ?? []).map((r) => ({
+            ...r,
+            is_retainer: true,
+            parent_name: c.name,
+            user_id: m.user_id,
+            username: m.username,
+            // fill in fields GMCharCard may reference with safe defaults
+            disciplines: [],
+            top_skills: [],
+            all_skills: [],
+            attributes: [],
+          })),
+        ])
       )
     : [];
 

@@ -598,12 +598,7 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
               ) : null}
 
               {/* Regular dots + colored temp dots */}
-              <DotRating value={val + (tempVal < 0 ? tempVal : 0)} max={5} size="text-sm" />
-              {tempVal > 0 && (
-                <span className="text-blue-400 text-sm tracking-widest ml-0.5">
-                  {"●".repeat(tempVal)}
-                </span>
-              )}
+              <DotRating value={val + tempVal} max={5} size="text-sm" />
               {tempVal < 0 && (
                 <span className="text-red-500 text-sm tracking-widest ml-0.5">
                   {"●".repeat(-tempVal)}
@@ -1682,19 +1677,32 @@ export default function CharacterSheet({
                   ))}
                 </div>
 
-                {/* Selected item display + browse button */}
+                {/* Browse button (left) + selected item display (right) */}
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-void-light border border-void-border rounded px-3 py-2 text-sm text-gray-400 min-h-[36px]">
-                    {addAdvId
-                      ? (addAdvType === "merit" ? availGameData.merits : addAdvType === "flaw" ? availGameData.flaws : availGameData.backgrounds)
-                          .find((x) => x.id === addAdvId)?.name ?? "Selected"
-                      : <span className="text-gray-600">None selected…</span>
-                    }
-                  </div>
                   <button
                     onClick={() => { setPickerSearch(""); setShowPickerModal(true); }}
                     className="vtm-btn py-1 px-3 text-sm shrink-0"
                   >Browse</button>
+                  <div className="flex-1 bg-void-light border border-void-border rounded px-3 py-2 text-sm text-gray-400 min-h-[36px] flex items-center justify-between gap-2">
+                    {addAdvId
+                      ? (() => {
+                          const list = addAdvType === "merit" ? availGameData.merits : addAdvType === "flaw" ? availGameData.flaws : availGameData.backgrounds;
+                          const item = list.find((x) => x.id === addAdvId);
+                          const dots = item ? (item.value ?? item.cost ?? null) : null;
+                          return item ? (
+                            <>
+                              <span>{item.name}</span>
+                              {dots > 0 && (
+                                <span className="text-blood-dark text-xs tracking-tight shrink-0">
+                                  {"●".repeat(Math.min(dots, 5))}
+                                </span>
+                              )}
+                            </>
+                          ) : <span>Selected</span>;
+                        })()
+                      : <span className="text-gray-600">None selected…</span>
+                    }
+                  </div>
                 </div>
 
                 {/* Level (merits + backgrounds) */}

@@ -451,19 +451,6 @@ export default function DashboardPage() {
               </span>
             )}
 
-            {/* Dice Roller */}
-            <button
-              onClick={() => setShowDice((v) => !v)}
-              className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                showDice
-                  ? "border-blood text-blood bg-blood-dark/20"
-                  : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-              }`}
-              title={showDice ? "Close dice roller" : "Open dice roller"}
-            >
-              ⚄ Dice
-            </button>
-
             <div className="h-4 border-l border-void-border mx-1" />
 
             {/* XP + Improve — hidden for retainers */}
@@ -514,6 +501,19 @@ export default function DashboardPage() {
               className="px-2 py-1 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors"
             >
               Edit Ambition & Desire
+            </button>
+
+            {/* Dice Roller — far right, distinctive solid design */}
+            <button
+              onClick={() => setShowDice((v) => !v)}
+              className={`ml-auto px-3 py-1.5 rounded text-xs font-gothic tracking-wider transition-all ${
+                showDice
+                  ? "bg-blood text-white shadow-lg shadow-blood/40 ring-1 ring-blood"
+                  : "bg-blood/80 hover:bg-blood text-white hover:shadow-md hover:shadow-blood/30"
+              }`}
+              title={showDice ? "Close dice roller" : "Open dice roller"}
+            >
+              ⚄ Dice Roller
             </button>
           </div>
 

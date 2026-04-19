@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import ConditionManager from "../components/gm/ConditionManager";
+import CharacterSheet from "../components/character/CharacterSheet";
 import { clanCardStyle } from "../utils/clanImages";
 
 function getRollHint(text) {
@@ -35,7 +36,6 @@ function DamageTrack({ active, superficial, aggravated }) {
     <div className="flex gap-1 flex-wrap">
       {Array.from({ length: TOTAL_BOXES }, (_, i) => {
         if (i >= active) {
-          // greyed-out unused box
           return (
             <div key={i} className="w-6 h-6 border border-gray-900 rounded-sm bg-gray-950 opacity-20" />
           );
@@ -93,12 +93,82 @@ function CondBadges({ conditions }) {
   );
 }
 
+// ── Last roll widget ─────────────────────────────────────────────────────────
+function outcomeColor(outcome) {
+  if (!outcome) return "text-gray-500";
+  if (outcome === "Bestial Failure")   return "text-red-400";
+  if (outcome === "Failure")           return "text-gray-500";
+  if (outcome === "Messy Critical")    return "text-orange-400";
+  if (outcome === "Critical Success!") return "text-yellow-400";
+  return "text-green-400";
+}
+
+function LastRollWidget({ roll }) {
+  if (!roll) return (
+    <div className="border border-void-border/40 rounded p-2 text-center">
+      <p className="text-[10px] text-gray-700 font-gothic uppercase tracking-widest">No rolls yet</p>
+    </div>
+  );
+
+  const timeStr = new Date(roll.created_at).toLocaleTimeString([], {
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+
+  return (
+    <div className="border border-void-border/50 rounded p-2 bg-black/20">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[9px] text-gray-600 uppercase tracking-widest font-gothic">Last Roll</span>
+        <span className="text-[9px] text-gray-700">{timeStr}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Dice pool summary */}
+        <span className="text-xs text-gray-400">
+          {roll.pool_size}d
+          {roll.hunger_dice > 0 && <span className="text-red-500">+{roll.hunger_dice}h</span>}
+        </span>
+        <span className="text-gray-700">→</span>
+        {/* Successes */}
+        <span className="text-sm font-gothic text-gray-200">
+          {roll.total_successes}
+          <span className="text-[10px] text-gray-500 ml-0.5">hits</span>
+        </span>
+        {/* Outcome */}
+        <span className={`text-xs font-gothic font-medium ml-auto ${outcomeColor(roll.outcome)}`}>
+          {roll.outcome}
+        </span>
+      </div>
+      {roll.label && (
+        <p className="text-[9px] text-gray-600 mt-0.5 italic">{roll.label}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Retainer row in session dropdown ─────────────────────────────────────────
+function RetainerRow({ retainer, onOpen }) {
+  return (
+    <button
+      onClick={() => onOpen(retainer.id)}
+      className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded border border-blue-800/40 bg-blue-950/10 hover:border-blue-500/60 hover:bg-blue-900/20 transition-colors text-left"
+    >
+      <div className="min-w-0">
+        <p className="text-xs font-gothic text-blue-300 truncate">{retainer.name}</p>
+        {retainer.concept && (
+          <p className="text-[10px] text-gray-500 italic truncate">{retainer.concept}</p>
+        )}
+      </div>
+      <span className="text-[10px] text-blue-700 shrink-0">View →</span>
+    </button>
+  );
+}
+
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
+  const [showRetainers, setShowRetainers]   = useState(false);
 
   return (
     <div
@@ -137,6 +207,14 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
           </div>
         )}
       </div>
+
+      {/* Last Roll — always visible when GM */}
+      {isGM && (
+        <div>
+          <p className="text-[9px] text-gray-600 uppercase tracking-widest font-gothic mb-1">⚄ Dice</p>
+          <LastRollWidget roll={lastRoll} />
+        </div>
+      )}
 
       {/* Blood Potency + Humanity + Hunger */}
       <div className="flex flex-col gap-1.5">
@@ -184,7 +262,6 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
               const open = expandedDisc === d.name;
               return (
                 <div key={d.name}>
-                  {/* Discipline row — click to toggle powers */}
                   <button
                     className="w-full flex items-center justify-between gap-2 text-left hover:text-white transition-colors"
                     onClick={() => setExpandedDisc(open ? null : d.name)}
@@ -198,33 +275,28 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
                     <span className="text-gray-600 text-[10px]">{open ? "▲" : "▼"}</span>
                   </button>
 
-                  {/* Power list */}
                   {open && d.powers?.length > 0 && (
                     <div className="mt-2 ml-2 space-y-2">
                       {d.powers.map((pw) => {
                         const info = parsePowerInfo(pw.system_text);
                         return (
                           <div key={pw.id} className="rounded border border-void-border/40 bg-black/20 p-2">
-                            {/* Name + dot level */}
                             <div className="flex items-center gap-1.5 mb-1">
                               <span className="text-xs text-gray-200 font-gothic font-medium">{pw.name}</span>
                               <span className="text-blood-dark text-[9px] tracking-tight">
                                 {"●".repeat(pw.level)}{"○".repeat(5 - pw.level)}
                               </span>
                             </div>
-                            {/* Description */}
                             {pw.description && (
                               <p className="text-[10px] text-gray-500 italic leading-relaxed mb-1.5">
                                 {pw.description}
                               </p>
                             )}
-                            {/* Prerequisite */}
                             {pw.prerequisite && (
                               <div className="text-[10px] text-red-600 mb-1.5 border-l-2 border-amber-600 pl-1.5">
                                 <span className="font-medium">Requires:</span> {pw.prerequisite}
                               </div>
                             )}
-                            {/* Highlighted roll stats */}
                             <div className="flex flex-col gap-0.5">
                               {info.dicePool && (
                                 <div className="flex items-baseline gap-1.5">
@@ -243,7 +315,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
                                   <span className="text-[9px] text-gray-600 uppercase tracking-wider shrink-0">Duration</span>
                                   <span className="text-[10px] text-gray-400">{info.duration}</span>
                                 </div>
-                               )} 
+                              )}
                             </div>
                           </div>
                         );
@@ -260,6 +332,28 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange }) {
         </div>
       )}
 
+      {/* Retainers dropdown */}
+      {char.retainers?.length > 0 && (
+        <div className="border-t border-void-border/40 pt-3">
+          <button
+            onClick={() => setShowRetainers((v) => !v)}
+            className="w-full flex items-center justify-between text-left mb-2"
+          >
+            <p className="text-xs text-blue-400/80 font-gothic tracking-widest uppercase">
+              Retainers ({char.retainers.length})
+            </p>
+            <span className="text-gray-600 text-[10px]">{showRetainers ? "▲" : "▼"}</span>
+          </button>
+          {showRetainers && (
+            <div className="space-y-1.5">
+              {char.retainers.map((r) => (
+                <RetainerRow key={r.id} retainer={r} onOpen={onOpenRetainer} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
@@ -273,6 +367,23 @@ export default function SessionModePage() {
   const [lastSync,  setLastSync]     = useState(null);
   const [conditionsMap, setConditionsMap] = useState({});
   const [isGM, setIsGM] = useState(false);
+
+  // lastRollMap: username → most recent RollOut for that player
+  const [lastRollMap, setLastRollMap] = useState({});
+
+  // retainer modal
+  const [retainerModal, setRetainerModal]     = useState(null); // full character object
+  const [loadingRetainer, setLoadingRetainer] = useState(false);
+
+  const openRetainer = useCallback(async (id) => {
+    setLoadingRetainer(true);
+    setRetainerModal(null);
+    try {
+      const res = await api.get(`/api/characters/${id}`);
+      setRetainerModal(res.data);
+    } catch (_) { /* silent */ }
+    finally { setLoadingRetainer(false); }
+  }, []);
 
   // Check if current user is a GM
   useEffect(() => {
@@ -294,6 +405,23 @@ export default function SessionModePage() {
     });
   }, []);
 
+  // Fetch latest roll per player username for this group
+  const fetchRolls = useCallback(async () => {
+    try {
+      const res = await api.get(`/api/dice/history/group/${groupId}?limit=100`);
+      // Build map: username → most recent roll (rolls are already ordered newest first)
+      const map = {};
+      for (const roll of res.data) {
+        if (!map[roll.username]) {
+          map[roll.username] = roll;
+        }
+      }
+      setLastRollMap(map);
+    } catch (_) {
+      // GM may not own the group if it's a player view — silent fail
+    }
+  }, [groupId]);
+
   const refresh = useCallback(async () => {
     try {
       const res = await api.get(`/api/groups/${groupId}`);
@@ -309,9 +437,13 @@ export default function SessionModePage() {
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 5000);
+    fetchRolls();
+    const interval = setInterval(() => {
+      refresh();
+      fetchRolls();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, fetchRolls]);
 
   // Re-fetch conditions for one character after GM makes a change
   const refreshConditionsFor = useCallback((charId) => {
@@ -375,6 +507,8 @@ export default function SessionModePage() {
               conditions={conditionsMap[char.id] ?? []}
               isGM={isGM}
               onConditionsChange={() => refreshConditionsFor(char.id)}
+              lastRoll={lastRollMap[player] ?? null}
+              onOpenRetainer={openRetainer}
             />
           ))}
         </div>
@@ -383,6 +517,46 @@ export default function SessionModePage() {
       {group && cards.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-gray-600 font-gothic text-xl">No characters in this group yet.</p>
+        </div>
+      )}
+
+      {/* ── Retainer full-stat modal ── */}
+      {(retainerModal || loadingRetainer) && (
+        <div
+          className="fixed inset-0 bg-black/85 z-50 flex flex-col overflow-hidden"
+          onClick={() => { if (!loadingRetainer) setRetainerModal(null); }}
+        >
+          <div
+            className="relative flex flex-col w-full h-full max-w-5xl mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-blue-800/50 bg-gray-950 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-blue-500 text-[10px] uppercase tracking-widest font-gothic">Retainer</span>
+                <span className="font-gothic text-blue-300 text-lg">
+                  {loadingRetainer ? "Loading…" : retainerModal?.name}
+                </span>
+              </div>
+              <button
+                onClick={() => setRetainerModal(null)}
+                className="text-gray-600 hover:text-gray-300 transition-colors font-gothic tracking-wider text-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
+              {loadingRetainer ? (
+                <div className="flex items-center justify-center h-64">
+                  <p className="font-gothic text-blue-400 text-xl animate-pulse">Summoning retainer…</p>
+                </div>
+              ) : retainerModal ? (
+                <CharacterSheet character={retainerModal} />
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
     </div>

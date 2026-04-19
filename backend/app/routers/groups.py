@@ -63,6 +63,30 @@ def build_character_card(char: Character, db: Session) -> GMCharacterCard:
     for disc_id in powers_by_disc:
         powers_by_disc[disc_id].sort(key=lambda p: p["level"])
 
+    # Load retainers for this character
+    retainer_chars = (
+        db.query(Character)
+        .options(joinedload(Character.clan))
+        .filter(Character.parent_character_id == char.id, Character.is_retainer == True)
+        .all()
+    )
+    retainers_data = [
+        {
+            "id": r.id,
+            "name": r.name,
+            "concept": r.concept,
+            "health": r.health,
+            "health_superficial": r.health_superficial,
+            "health_aggravated": r.health_aggravated,
+            "willpower": r.willpower,
+            "willpower_superficial": r.willpower_superficial,
+            "willpower_aggravated": r.willpower_aggravated,
+            "blood_potency": r.blood_potency,
+            "humanity": r.humanity,
+        }
+        for r in retainer_chars
+    ]
+
     top3 = [s for s in skills if s.value > 0][:3]
     return GMCharacterCard(
         id=char.id,
@@ -91,6 +115,7 @@ def build_character_card(char: Character, db: Session) -> GMCharacterCard:
             for cd in discs
         ],
         notes=char.notes,
+        retainers=retainers_data,
     )
 
 

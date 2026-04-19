@@ -29,6 +29,7 @@ class RollSaveRequest(BaseModel):
 class RollOut(BaseModel):
     id:              int
     username:        str
+    character_id:    Optional[int] = None
     pool_size:       int
     hunger_dice:     int
     total_successes: int
@@ -89,6 +90,7 @@ def my_history(
     )
     for r in rolls:
         r.username = r.user.username
+        # character_id is already on the model, Pydantic reads it via from_attributes
     return rolls
 
 

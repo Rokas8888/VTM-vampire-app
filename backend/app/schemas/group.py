@@ -38,6 +38,7 @@ class GMCharacterCard(BaseModel):
     attributes: List[dict]      # [{"name": str, "value": int}]
     disciplines: List[dict] = []  # [{"name": str, "level": int}]
     notes: Optional[str] = None
+    retainers: List[dict] = []   # [{id, name, concept, health, health_superficial, health_aggravated, willpower, willpower_superficial, willpower_aggravated}]
 
     class Config:
         from_attributes = True
