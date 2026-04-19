@@ -643,6 +643,29 @@ export default function CharacterSheet({
   const [autoSaveStatus,  setAutoSaveStatus]  = useState(null); // null | "saving" | "saved"
   const autoSaveTimer = useRef(null);
 
+  // Portrait upload
+  const [portraitUrl, setPortraitUrl] = useState(character.portrait_url || null);
+  const [portraitUploading, setPortraitUploading] = useState(false);
+  const portraitInputRef = useRef(null);
+
+  const handlePortraitUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPortraitUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await api.post(`/api/portraits/${character.id}`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setPortraitUrl(res.data.portrait_url);
+    } catch (err) {
+      console.error("Portrait upload failed", err);
+    } finally {
+      setPortraitUploading(false);
+    }
+  };
+
   // Dice roller state
   const [showRemorse,     setShowRemorse]     = useState(false);
 
@@ -685,8 +708,11 @@ export default function CharacterSheet({
       return next;
     });
 
-  // Add-merit/flaw/background panel (shown when onImprove is active)
+  // Add-merit/flaw/background panel (shown when onImprove is active OR editAdvantages is on)
+  const [editAdvantages, setEditAdvantages] = useState(false);
   const [showAddAdvantage, setShowAddAdvantage] = useState(false);
+  const [showPickerModal, setShowPickerModal] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
   const [addAdvType, setAddAdvType] = useState("merit"); // "merit"|"flaw"|"background"
   const [availGameData, setAvailGameData] = useState({ merits: [], flaws: [], backgrounds: [] });
   const [addAdvId, setAddAdvId] = useState(null);
@@ -979,18 +1005,51 @@ export default function CharacterSheet({
             }}
           />
           {/* Content on top */}
-          <div className="relative z-10 flex flex-col gap-4">
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Clan</p>
-              <p className="font-gothic text-lg text-gray-100">{character.clan?.name ?? "—"}</p>
+          <div className="relative z-10 flex gap-4 h-full">
+            <div className="flex flex-col gap-4 flex-1">
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Clan</p>
+                <p className="font-gothic text-lg text-gray-100">{character.clan?.name ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Predator Type</p>
+                <p className="text-gray-200 text-sm">{character.predator_type?.name ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Generation</p>
+                <p className="text-gray-200 text-sm">{GENERATION_LABEL[character.generation] ?? "—"}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Predator Type</p>
-              <p className="text-gray-200 text-sm">{character.predator_type?.name ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Generation</p>
-              <p className="text-gray-200 text-sm">{GENERATION_LABEL[character.generation] ?? "—"}</p>
+
+            {/* Portrait — sits over the clan art */}
+            <div className="relative shrink-0 self-stretch flex items-center">
+              <div
+                className="w-36 h-full min-h-[120px] rounded-lg border-2 border-void-border/60 overflow-hidden bg-void/60 cursor-pointer group"
+                onClick={() => portraitInputRef.current?.click()}
+                title="Click to upload photo"
+              >
+                {portraitUrl ? (
+                  <img
+                    src={`${import.meta.env.VITE_API_URL || "http://localhost:8000"}${portraitUrl}`}
+                    alt="Portrait"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs text-center px-2">
+                    {portraitUploading ? "…" : "Add\nPhoto"}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-gray-300">
+                  {portraitUploading ? "Uploading…" : "Change"}
+                </div>
+              </div>
+              <input
+                ref={portraitInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePortraitUpload}
+              />
             </div>
           </div>
         </div>
@@ -1152,7 +1211,17 @@ export default function CharacterSheet({
       </Section>
 
       {/* ── Advantages & Flaws ── */}
-      <Section title="Advantages & Flaws">
+      <Section title={
+        <div className="flex items-center justify-between">
+          <span>Advantages &amp; Flaws</span>
+          <button
+            onClick={() => { setEditAdvantages((v) => !v); setShowAddAdvantage(false); }}
+            className="text-xs font-sans normal-case tracking-normal text-gray-600 hover:text-blood transition-colors"
+          >
+            {editAdvantages ? "✕ Done" : "Edit"}
+          </button>
+        </div>
+      }>
 
         {/* Info popup overlay */}
         {infoPopup && (
@@ -1197,7 +1266,21 @@ export default function CharacterSheet({
                             title="View full details"
                           >ℹ</button>
                         </div>
-                        <DotRating value={cm.level} max={5} size="text-xs" />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <DotRating value={cm.level} max={5} size="text-xs" />
+                          {editAdvantages && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.delete(`/api/characters/${character.id}/merits/${cm.merit.id}`);
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                } catch (e) { console.error(e); }
+                              }}
+                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                              title="Remove merit"
+                            >✕</button>
+                          )}
+                        </div>
                       </div>
                       {isOpen && (
                         <div className="mt-0.5 ml-1 text-xs text-gray-500 leading-relaxed">
@@ -1263,6 +1346,18 @@ export default function CharacterSheet({
                               >+</button>
                             ) : <span className="w-4 h-4 inline-block" />
                           ) : null}
+                          {editAdvantages && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.delete(`/api/characters/${character.id}/backgrounds/${cb.background.id}`);
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                } catch (e) { console.error(e); }
+                              }}
+                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                              title="Remove background"
+                            >✕</button>
+                          )}
                         </div>
                       </div>
                       {isOpen && cb.background.description && (
@@ -1302,7 +1397,21 @@ export default function CharacterSheet({
                             title="View full details"
                           >ℹ</button>
                         </div>
-                        <span className="text-blood-dark text-xs ml-2 shrink-0">{"●".repeat(cf.flaw.value)}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-blood-dark text-xs">{"●".repeat(cf.flaw.value)}</span>
+                          {editAdvantages && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.delete(`/api/characters/${character.id}/flaws/${cf.flaw.id}`);
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                } catch (e) { console.error(e); }
+                              }}
+                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                              title="Remove flaw"
+                            >✕</button>
+                          )}
+                        </div>
                       </div>
                       {isOpen && (
                         <div className="mt-0.5 ml-1 text-xs text-gray-500 leading-relaxed">
@@ -1316,8 +1425,8 @@ export default function CharacterSheet({
           </div>
         </div>
 
-        {/* Add merit/flaw/background panel — shown when improve or edit mode is on */}
-        {(onImprove || onUnimprove) && (
+        {/* Add merit/flaw/background panel — shown when improve mode or editAdvantages is on */}
+        {(onImprove || onUnimprove || editAdvantages) && (
           <div className="mt-4 border-t border-void-border/40 pt-4">
             <button
               onClick={() => { setShowAddAdvantage((v) => !v); setAddAdvError(null); setAddAdvId(null); setAddAdvLevel(1); setAddAdvNotes(""); }}
@@ -1331,31 +1440,26 @@ export default function CharacterSheet({
                 {/* Type tabs */}
                 <div className="flex gap-2">
                   {["merit", "flaw", "background"].map((t) => (
-                    <button key={t} onClick={() => { setAddAdvType(t); setAddAdvId(null); }}
+                    <button key={t} onClick={() => { setAddAdvType(t); setAddAdvId(null); setAddAdvLevel(1); setAddAdvNotes(""); }}
                       className={`px-3 py-1 rounded text-xs font-gothic capitalize transition-colors ${addAdvType === t ? "bg-blood-dark/40 border border-blood-dark text-blood" : "border border-void-border text-gray-500 hover:border-gray-500"}`}
                     >{t}</button>
                   ))}
                 </div>
 
-                {/* Select item */}
-                <select
-                  value={addAdvId ?? ""}
-                  onChange={(e) => setAddAdvId(Number(e.target.value) || null)}
-                  className="vtm-input text-sm"
-                >
-                  <option value="">Select a {addAdvType}…</option>
-                  {(addAdvType === "merit" ? availGameData.merits
-                   : addAdvType === "flaw" ? availGameData.flaws
-                   : availGameData.backgrounds
-                  ).map((item) => {
-                    const dots = item.value ?? item.cost ?? null;
-                    return (
-                      <option key={item.id} value={item.id}>
-                        {item.name}{dots ? ` (${"●".repeat(dots)})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+                {/* Selected item display + browse button */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-void-light border border-void-border rounded px-3 py-2 text-sm text-gray-400 min-h-[36px]">
+                    {addAdvId
+                      ? (addAdvType === "merit" ? availGameData.merits : addAdvType === "flaw" ? availGameData.flaws : availGameData.backgrounds)
+                          .find((x) => x.id === addAdvId)?.name ?? "Selected"
+                      : <span className="text-gray-600">None selected…</span>
+                    }
+                  </div>
+                  <button
+                    onClick={() => { setPickerSearch(""); setShowPickerModal(true); }}
+                    className="vtm-btn py-1 px-3 text-sm shrink-0"
+                  >Browse</button>
+                </div>
 
                 {/* Level (merits + backgrounds) */}
                 {addAdvType !== "flaw" && (
@@ -1370,7 +1474,7 @@ export default function CharacterSheet({
                   </div>
                 )}
 
-                {/* Notes (for flaws that take custom text) */}
+                {/* Notes */}
                 <input
                   value={addAdvNotes}
                   onChange={(e) => setAddAdvNotes(e.target.value)}
@@ -1394,7 +1498,6 @@ export default function CharacterSheet({
                       } else {
                         res = await api.post(`/api/characters/${character.id}/backgrounds`, { background_id: addAdvId, level: addAdvLevel, notes: addAdvNotes || null });
                       }
-                      // Notify parent to update with the new character data
                       if (onCharacterUpdate) onCharacterUpdate(res.data);
                       setShowAddAdvantage(false);
                     } catch (err) {
@@ -1407,6 +1510,57 @@ export default function CharacterSheet({
                 >
                   {addAdvSaving ? "Adding…" : `Add ${addAdvType}`}
                 </button>
+              </div>
+            )}
+
+            {/* ── Picker modal ── */}
+            {showPickerModal && (
+              <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowPickerModal(false)}>
+                <div className="bg-void-light border border-void-border rounded-lg w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-void-border shrink-0">
+                    <h4 className="font-gothic text-blood text-lg capitalize">Choose a {addAdvType}</h4>
+                    <button onClick={() => setShowPickerModal(false)} className="text-gray-600 hover:text-gray-300">✕</button>
+                  </div>
+                  {/* Search */}
+                  <div className="px-5 py-3 shrink-0">
+                    <input
+                      autoFocus
+                      value={pickerSearch}
+                      onChange={(e) => setPickerSearch(e.target.value)}
+                      placeholder={`Search ${addAdvType}s…`}
+                      className="vtm-input text-sm w-full"
+                    />
+                  </div>
+                  {/* List */}
+                  <div className="overflow-y-auto px-5 pb-5 space-y-2">
+                    {(addAdvType === "merit" ? availGameData.merits : addAdvType === "flaw" ? availGameData.flaws : availGameData.backgrounds)
+                      .filter((item) => item.name.toLowerCase().includes(pickerSearch.toLowerCase()))
+                      .map((item) => {
+                        const dots = item.value ?? item.cost ?? null;
+                        const isSelected = addAdvId === item.id;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => { setAddAdvId(item.id); setShowPickerModal(false); }}
+                            className={`rounded-lg border p-3 cursor-pointer transition-colors ${isSelected ? "border-blood bg-blood-dark/20" : "border-void-border hover:border-gray-500 bg-void"}`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-gray-200 font-medium text-sm">{item.name}</span>
+                              {dots && <span className="text-blood-dark text-xs shrink-0">{"●".repeat(dots)}</span>}
+                            </div>
+                            {item.description && (
+                              <p className="text-gray-500 text-xs mt-1 leading-relaxed italic">{item.description}</p>
+                            )}
+                            {item.system_text && (
+                              <p className="text-gray-400 text-xs mt-1 leading-relaxed">{item.system_text}</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    }
+                  </div>
+                </div>
               </div>
             )}
           </div>
