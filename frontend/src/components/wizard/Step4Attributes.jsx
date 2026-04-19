@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useWizardStore from "../../store/wizardStore";
+import { randomAttributes } from "../../utils/wizardRandomize";
 
 const ATTRIBUTES = {
   Physical: ["Strength", "Dexterity", "Stamina"],
@@ -55,7 +56,15 @@ export default function Step4Attributes({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Attributes</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Attributes</h2>
+        <button
+          onClick={() => setAttrs(randomAttributes())}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Suggest
+        </button>
+      </div>
       <p className="text-gray-400 mb-4">
         Set your 9 attributes. Each attribute starts at 1 (the minimum).
       </p>

@@ -13,14 +13,25 @@ const GENERATION_LABEL = {
 
 // ── Directory character card ───────────────────────────────────────────────────
 function DirectoryCard({ char, onClick }) {
+  const isRetainer = char.is_retainer;
   return (
     <div
       onClick={onClick}
-      className="bg-void-light border border-void-border rounded-lg p-5 cursor-pointer hover:border-blood transition-colors flex flex-col gap-3"
+      className={`rounded-lg p-5 cursor-pointer flex flex-col gap-3 transition-colors ${
+        isRetainer
+          ? "bg-blue-950/40 border border-blue-800/60 hover:border-blue-400"
+          : "bg-void-light border border-void-border hover:border-blood"
+      }`}
     >
       <div>
-        <h3 className="font-gothic text-blood text-lg leading-tight truncate">{char.name ?? "Unnamed"}</h3>
-        <p className="text-gray-500 text-xs mt-0.5">{char.clan?.name ?? "—"}</p>
+        <h3 className={`font-gothic text-lg leading-tight truncate ${isRetainer ? "text-blue-300" : "text-blood"}`}>
+          {char.name ?? "Unnamed"}
+        </h3>
+        <p className="text-gray-500 text-xs mt-0.5">
+          {isRetainer
+            ? <span className="text-blue-500">Retainer{char.parent_character_name ? ` of ${char.parent_character_name}` : ""}</span>
+            : (char.clan?.name ?? "—")}
+        </p>
       </div>
       <div className="flex gap-3 text-xs text-gray-500 flex-wrap">
         <span>Gen <span className="text-gray-300">{char.generation ? GENERATION_LABEL[char.generation] : "—"}</span></span>
@@ -41,9 +52,10 @@ export default function PlayerDirectoryPage() {
   const [error,   setError]   = useState("");
 
   // Filters — all client-side since dataset is small
-  const [search,     setSearch]     = useState("");
-  const [clanFilter, setClanFilter] = useState("");
-  const [genFilter,  setGenFilter]  = useState("");
+  const [search,         setSearch]         = useState("");
+  const [clanFilter,     setClanFilter]     = useState("");
+  const [genFilter,      setGenFilter]      = useState("");
+  const [showRetainers,  setShowRetainers]  = useState(false);
 
   // Read-only sheet modal
   const [viewChar,     setViewChar]     = useState(null);
@@ -65,8 +77,9 @@ export default function PlayerDirectoryPage() {
   // Build clan list for dropdown from current results
   const clans = [...new Set(chars.map((c) => c.clan?.name).filter(Boolean))].sort();
 
-  // Apply filters
+  // Apply filters — retainers hidden by default
   const filtered = chars.filter((c) => {
+    if (c.is_retainer && !showRetainers) return false;
     const matchSearch = !search     || c.name?.toLowerCase().includes(search.toLowerCase());
     const matchClan   = !clanFilter || c.clan?.name === clanFilter;
     const matchGen    = !genFilter  || c.generation === genFilter;
@@ -132,6 +145,16 @@ export default function PlayerDirectoryPage() {
             <option value="neonate">12th — Neonate</option>
             <option value="ancillae">11th — Ancillae</option>
           </select>
+          <button
+            onClick={() => setShowRetainers((v) => !v)}
+            className={`text-xs font-gothic tracking-wider px-3 py-2 rounded border transition-colors ${
+              showRetainers
+                ? "border-blue-600 text-blue-300 bg-blue-950/40 hover:border-blue-400"
+                : "border-void-border text-gray-500 hover:border-blue-700 hover:text-blue-400"
+            }`}
+          >
+            {showRetainers ? "Hide Retainers" : "Show Retainers"}
+          </button>
           {(search || clanFilter || genFilter) && (
             <button
               onClick={() => { setSearch(""); setClanFilter(""); setGenFilter(""); }}
@@ -145,7 +168,10 @@ export default function PlayerDirectoryPage() {
         {/* Count */}
         {!loading && (
           <p className="text-gray-700 text-xs mb-4 font-gothic tracking-wider">
-            {filtered.length} {filtered.length === 1 ? "kindred" : "kindred"} found
+            {filtered.length} kindred found
+            {!showRetainers && chars.some((c) => c.is_retainer) && (
+              <span className="ml-2 text-blue-800">· retainers hidden</span>
+            )}
           </p>
         )}
 

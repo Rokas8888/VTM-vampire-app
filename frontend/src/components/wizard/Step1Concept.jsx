@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useWizardStore from "../../store/wizardStore";
+import { randomConcept } from "../../utils/wizardRandomize";
 
 export default function Step1Concept({ onNext }) {
   const { data, saveStep, error } = useWizardStore();
@@ -21,7 +22,15 @@ export default function Step1Concept({ onNext }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Core Concept</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Core Concept</h2>
+        <button
+          onClick={() => setForm(randomConcept())}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Suggest
+        </button>
+      </div>
       <p className="text-gray-400 mb-8">Who were you before the Embrace? Who are you now?</p>
 
       <div className="space-y-6">

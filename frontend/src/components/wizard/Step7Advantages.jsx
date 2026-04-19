@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import useWizardStore from "../../store/wizardStore";
+import { randomAdvantages } from "../../utils/wizardRandomize";
 
 export default function Step7Advantages({ onNext, onBack }) {
   const { data, saveStep, error } = useWizardStore();
@@ -125,7 +126,22 @@ export default function Step7Advantages({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Advantages & Flaws</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Advantages & Flaws</h2>
+        {merits.length > 0 && (
+          <button
+            onClick={() => {
+              const r = randomAdvantages(merits, backgrounds, flaws);
+              setAdvantages(r.advantages);
+              setSelectedFlaws(r.flaws);
+              setCustomTexts({});
+            }}
+            className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+          >
+            ✦ Suggest
+          </button>
+        )}
+      </div>
       <p className="text-gray-400 mb-2">Spend 7 points on merits and backgrounds. Take exactly 2 points of flaws.</p>
       <p className="text-gray-500 text-xs mb-4 italic">
         Some merits and flaws require you to specify details (e.g. the type of contact, or what you're addicted to). A text box will appear when needed.

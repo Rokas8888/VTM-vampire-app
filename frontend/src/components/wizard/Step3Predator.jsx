@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import useWizardStore from "../../store/wizardStore";
+import { randomPredatorType } from "../../utils/wizardRandomize";
 
-export default function Step3Predator({ onNext, onBack }) {
+export default function Step3Predator({ onNext, onBack, addPredatorMode = false, characterId = null }) {
+  const navigate = useNavigate();
   const { data, saveStep, error } = useWizardStore();
   const [types, setTypes]   = useState([]);
   const [selected, setSelected] = useState(data.step9?.predator_type_id || null);
@@ -12,6 +15,7 @@ export default function Step3Predator({ onNext, onBack }) {
   const [chosenDiscipline, setChosenDiscipline] = useState(data.step9?.chosen_discipline || null);
   const [chosenSpecialtySkill, setChosenSpecialtySkill] = useState(data.step9?.chosen_specialty_skill || null);
   const [chosenSpecialtyName, setChosenSpecialtyName] = useState(data.step9?.chosen_specialty_name || null);
+  const [chosenFlaw, setChosenFlaw] = useState(data.step9?.chosen_flaw || null);
 
   useEffect(() => {
     api.get("/api/game-data/predator-types").then((r) => setTypes(r.data));
@@ -27,6 +31,7 @@ export default function Step3Predator({ onNext, onBack }) {
     setChosenDiscipline(null);
     setChosenSpecialtySkill(null);
     setChosenSpecialtyName(null);
+    setChosenFlaw(null);
   };
 
   // Validate that choices are made when required
@@ -34,8 +39,12 @@ export default function Step3Predator({ onNext, onBack }) {
     if (!choices) return true;
     if (choices.discipline && choices.discipline.length > 1 && !chosenDiscipline) return false;
     if (choices.specialty && choices.specialty.length > 1 && !chosenSpecialtyName) return false;
+    if (choices.flaw && choices.flaw.length > 1 && !chosenFlaw) return false;
     return true;
   };
+
+  const [applyError, setApplyError] = useState(null);
+  const [applying, setApplying] = useState(false);
 
   const handleNext = async () => {
     const stepData = {
@@ -43,6 +52,7 @@ export default function Step3Predator({ onNext, onBack }) {
       chosen_discipline: chosenDiscipline,
       chosen_specialty_skill: chosenSpecialtySkill,
       chosen_specialty_name: chosenSpecialtyName,
+      chosen_flaw: chosenFlaw,
     };
     const ok = await saveStep(9, stepData);
     if (ok) onNext();
@@ -53,9 +63,46 @@ export default function Step3Predator({ onNext, onBack }) {
     if (ok) onNext();
   };
 
+  // addPredatorMode: apply predator type to an already-complete character
+  const handleApply = async () => {
+    setApplyError(null);
+    setApplying(true);
+    try {
+      await api.post(`/api/characters/${characterId}/set-predator-type`, {
+        predator_type_id: selected,
+        chosen_discipline: chosenDiscipline,
+        chosen_specialty_skill: chosenSpecialtySkill,
+        chosen_specialty_name: chosenSpecialtyName,
+        chosen_flaw: chosenFlaw,
+      });
+      navigate("/dashboard");
+    } catch (e) {
+      setApplyError(e.response?.data?.detail ?? "Failed to apply predator type.");
+    } finally {
+      setApplying(false);
+    }
+  };
+
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Predator Type</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Predator Type</h2>
+        {types.length > 0 && (
+          <button
+            onClick={() => {
+              const r = randomPredatorType(types);
+              setSelected(r.selected);
+              setChosenDiscipline(r.chosenDiscipline);
+              setChosenSpecialtySkill(r.chosenSpecialtySkill);
+              setChosenSpecialtyName(r.chosenSpecialtyName);
+              setChosenFlaw(r.chosenFlaw);
+            }}
+            className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+          >
+            ✦ Suggest
+          </button>
+        )}
+      </div>
       <p className="text-gray-400 mb-2">How do you hunt? Your predator type shapes how you feed — and what it costs you.</p>
       <p className="text-gray-600 text-sm mb-6 italic">
         This step is optional. Some chronicles skip predator types. If unsure, ask your Storyteller.
@@ -97,10 +144,10 @@ export default function Step3Predator({ onNext, onBack }) {
           {choices.discipline && choices.discipline.length > 1 && (
             <div>
               <p className="text-gray-400 text-xs mb-2">Discipline (choose one):</p>
-              <div className="flex gap-3">
-                {choices.discipline.map((d) => (
+              <div className="flex flex-wrap gap-3">
+                {choices.discipline.map((d, i) => (
                   <button
-                    key={d.name}
+                    key={i}
                     onClick={() => setChosenDiscipline(d.name)}
                     className={`flex-1 border rounded px-3 py-2 text-xs transition-all ${
                       chosenDiscipline === d.name
@@ -119,18 +166,41 @@ export default function Step3Predator({ onNext, onBack }) {
           {choices.specialty && choices.specialty.length > 1 && (
             <div>
               <p className="text-gray-400 text-xs mb-2">Specialty (choose one):</p>
-              <div className="flex gap-3">
-                {choices.specialty.map((s) => (
+              <div className="flex flex-wrap gap-3">
+                {choices.specialty.map((s, i) => (
                   <button
-                    key={s.name}
+                    key={i}
                     onClick={() => { setChosenSpecialtySkill(s.skill); setChosenSpecialtyName(s.name); }}
                     className={`flex-1 border rounded px-3 py-2 text-xs transition-all ${
-                      chosenSpecialtyName === s.name
+                      chosenSpecialtySkill === s.skill
                         ? "border-blood bg-blood-dark/20 text-gray-200"
                         : "border-void-border text-gray-500 hover:border-gray-500"
                     }`}
                   >
                     <span className="font-gothic">{s.skill}</span>: {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {choices.flaw && choices.flaw.length > 1 && (
+            <div>
+              <p className="text-gray-400 text-xs mb-2">Flaw received (choose one):</p>
+              <div className="flex flex-wrap gap-3">
+                {choices.flaw.map((f, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setChosenFlaw(f.name)}
+                    className={`flex-1 border rounded px-3 py-2 text-xs transition-all ${
+                      chosenFlaw === f.name
+                        ? "border-blood bg-blood-dark/20 text-gray-200"
+                        : "border-void-border text-gray-500 hover:border-gray-500"
+                    }`}
+                  >
+                    <span className="font-gothic">{f.name}</span>
+                    {f.notes && <span className="block text-gray-600 mt-0.5">{f.notes}</span>}
+                    {f.value && <span className="block text-blood/70 mt-0.5">{"•".repeat(f.value)}</span>}
                   </button>
                 ))}
               </div>
@@ -148,20 +218,24 @@ export default function Step3Predator({ onNext, onBack }) {
         </button>
       )}
 
-      {error && <p className="text-blood mt-4 text-sm">{error}</p>}
+      {(error || applyError) && <p className="text-blood mt-4 text-sm">{error || applyError}</p>}
 
       <div className="mt-8 flex justify-between items-center">
-        <button onClick={onBack} className="vtm-btn-secondary">← Back</button>
+        <button onClick={addPredatorMode ? () => navigate("/dashboard") : onBack} className="vtm-btn-secondary">
+          {addPredatorMode ? "← Cancel" : "← Back"}
+        </button>
         <div className="flex gap-3">
-          <button onClick={handleSkip} className="vtm-btn-secondary">
-            Skip →
-          </button>
+          {!addPredatorMode && (
+            <button onClick={handleSkip} className="vtm-btn-secondary">
+              Skip →
+            </button>
+          )}
           <button
-            onClick={handleNext}
-            disabled={!selected || !choicesComplete()}
+            onClick={addPredatorMode ? handleApply : handleNext}
+            disabled={!selected || !choicesComplete() || applying}
             className="vtm-btn"
           >
-            Next: Generation →
+            {addPredatorMode ? (applying ? "Saving…" : "Save Predator Type") : "Next: Generation →"}
           </button>
         </div>
       </div>
@@ -192,6 +266,15 @@ export default function Step3Predator({ onNext, onBack }) {
                       <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Free Specialty (choose one)</p>
                       <p className="text-gray-300 text-sm">{c.specialty.map((s) => `${s.skill}: ${s.name}`).join(" or ")}</p>
                     </div>
+                  )}
+                  {c.flaw && c.flaw.length > 1 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Flaw Received (choose one)</p>
+                      <p className="text-blood text-sm">{c.flaw.map((f) => `${f.name}${f.notes ? ` — ${f.notes}` : ""}`).join(" or ")}</p>
+                    </div>
+                  )}
+                  {c.specialty && c.specialty.every((s) => s.name === c.specialty[0].name) && (
+                    <p className="text-gray-600 text-xs mt-1 italic">Specify your scene/subculture after selection.</p>
                   )}
                 </>
               );

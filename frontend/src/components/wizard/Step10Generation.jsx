@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import useWizardStore from "../../store/wizardStore";
+import { randomGeneration } from "../../utils/wizardRandomize";
 
 const GENERATIONS = [
   { value: "childer", label: "Childer", gen: "13th", bp: 0, desc: "Newly Embraced, still learning the ways of the night. Your blood is the weakest, but you are fresh and full of potential." },
@@ -38,7 +39,19 @@ export default function Step10Generation({ onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Generation & Review</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Generation & Review</h2>
+        <button
+          onClick={() => {
+            const r = randomGeneration();
+            setGeneration(r.generation);
+            if (!biography) setBiography(r.biography);
+          }}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Suggest
+        </button>
+      </div>
       <p className="text-gray-400 mb-6">How long have you walked the night? Your generation determines your Blood Potency.</p>
 
       {/* Generation selection */}

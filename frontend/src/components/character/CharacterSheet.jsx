@@ -239,7 +239,7 @@ function PowerCard({ power }) {
 // Normal mode: only learned powers shown as expandable cards.
 // Improve mode: also shows available (unlearned, within current dot level) with XP buttons.
 // Raising a dot: V5 includes ONE free power at the new level — show a picker before submitting.
-const RITUAL_DISC_NAMES = ["Blood Sorcery", "Oblivion"];
+const RITUAL_DISC_NAMES = ["Blood Sorcery"];
 
 function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove, availableXp, onClaimFreePower, tempDots, onAddTempDot, onRemoveTempDot, freeEdit, onRemoveDiscipline, learnedRituals = [], onOpenRitualBook }) {
   const disc        = cd.discipline;
@@ -550,8 +550,13 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
 }
 
 // ── Attribute/skill column ────────────────────────────────────────────────────
-function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot, freeEdit }) {
+function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot, freeEdit, onAddSpecialty, onDeleteSpecialty }) {
   const minVal = traitType === "attribute" ? 1 : 0;
+  const canEditSpecialties = traitType === "skill" && (onImprove || freeEdit) && (onAddSpecialty || onDeleteSpecialty);
+  // Per-skill "add specialty" input state
+  const [addingSpecialtyFor, setAddingSpecialtyFor] = useState(null);
+  const [newSpecialtyText, setNewSpecialtyText] = useState("");
+
   return (
     <div className="flex-1 min-w-[160px]">
       <p className="font-gothic text-blood-dark text-sm tracking-wider uppercase mb-2">{heading}</p>
@@ -563,12 +568,11 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
         const refund      = traitType === "attribute" ? val * 5 : val * 3;
         const canAfford   = onImprove && val < 5 && (freeEdit || availableXp >= buyCost);
         const tempVal     = tempDotsMap?.[name] ?? 0;
+        const isAddingHere = addingSpecialtyFor === name;
         return (
-          <div key={name} className="flex justify-between items-center mb-1 gap-2">
-            <span className="text-gray-300 text-sm truncate">
-              {displayName}
-              {specs.length > 0 && <span className="text-blood-dark text-xs ml-1">({specs.join(", ")})</span>}
-            </span>
+          <div key={name} className="mb-2">
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-gray-300 text-sm truncate">{displayName}</span>
             <div className="flex items-center gap-1 shrink-0">
               {/* Undo improve / temp remove */}
               {onUnimprove ? (
@@ -633,6 +637,66 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
               ) : null}
             </div>
           </div>
+
+          {/* Specialties — shown below skill row in improve/freeEdit mode */}
+          {traitType === "skill" && (
+            <div className="ml-0 mt-0.5">
+              {specs.map((sp) => (
+                <span key={sp} className="inline-flex items-center gap-1 text-blood-dark text-xs mr-2">
+                  <span className="italic">{sp}</span>
+                  {canEditSpecialties && onDeleteSpecialty && (
+                    <button
+                      onClick={() => onDeleteSpecialty(name, sp)}
+                      title="Remove specialty"
+                      className="text-gray-700 hover:text-blood leading-none transition-colors"
+                    >✕</button>
+                  )}
+                </span>
+              ))}
+              {canEditSpecialties && onAddSpecialty && val > 0 && (
+                isAddingHere ? (
+                  <div className="flex items-center gap-1 mt-1">
+                    <input
+                      autoFocus
+                      className="bg-void border border-void-border rounded px-2 py-0.5 text-xs text-gray-200 focus:outline-none focus:border-blood w-28"
+                      placeholder="Specialty…"
+                      value={newSpecialtyText}
+                      onChange={(e) => setNewSpecialtyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newSpecialtyText.trim()) {
+                          onAddSpecialty(name, newSpecialtyText.trim());
+                          setNewSpecialtyText("");
+                          setAddingSpecialtyFor(null);
+                        }
+                        if (e.key === "Escape") { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newSpecialtyText.trim()) {
+                          onAddSpecialty(name, newSpecialtyText.trim());
+                          setNewSpecialtyText("");
+                          setAddingSpecialtyFor(null);
+                        }
+                      }}
+                      className="text-blood text-xs hover:text-red-400"
+                    >✓</button>
+                    <button
+                      onClick={() => { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }}
+                      className="text-gray-600 text-xs hover:text-gray-400"
+                    >✕</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setAddingSpecialtyFor(name); setNewSpecialtyText(""); }}
+                    className="text-gray-700 hover:text-blood text-xs transition-colors"
+                    title="Add specialty"
+                  >+ spec</button>
+                )
+              )}
+            </div>
+          )}
+        </div>
         );
       })}
     </div>
@@ -669,6 +733,9 @@ export default function CharacterSheet({
   onSetTempDots,     // (tempDotsObj) — saves temp dots to backend
   freeEdit = false,  // when true, all stats editable for free (retainer mode)
   onOpenRetainer,    // (retainerId) — opens retainer sheet
+  onAddPredatorType, // () — called when player wants to set a predator type post-wizard
+  onAddSpecialty,    // (skillName, specialtyName) — add specialty
+  onDeleteSpecialty, // (skillName, specialtyName) — delete specialty
 }) {
   const availableXp = character.total_xp - character.spent_xp;
 
@@ -747,6 +814,9 @@ export default function CharacterSheet({
 
   // Info popup (merit / flaw / background details)
   const [infoPopup, setInfoPopup] = useState(null); // { name, description, system_text } | null
+
+  // Clan bane dropdown
+  const [showClanBane, setShowClanBane] = useState(false);
 
   // Notes — always-visible inline textarea with auto-save
   const [notesText,    setNotesText]    = useState(character.notes || "");
@@ -945,6 +1015,12 @@ export default function CharacterSheet({
   // ── Temp dots ─────────────────────────────────────────────────────────────
   const tempDots = character.temp_dots || { attributes: {}, skills: {}, disciplines: {} };
 
+  // Stamina temp dots add/remove health slots; Composure temp dots add/remove willpower slots
+  const staminaTemp  = tempDots.attributes?.["Stamina"]  ?? 0;
+  const composureTemp = tempDots.attributes?.["Composure"] ?? 0;
+  const effectiveHealth    = Math.max(1, character.health    + staminaTemp);
+  const effectiveWillpower = Math.max(1, character.willpower + composureTemp);
+
   const handleAddTempDot = (category, key) => {
     if (!onSetTempDots) return;
     const current = tempDots[category]?.[String(key)] ?? 0;
@@ -1081,10 +1157,31 @@ export default function CharacterSheet({
               <div>
                 <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Clan</p>
                 <p className="font-gothic text-lg text-gray-100">{character.clan?.name ?? "—"}</p>
+                {character.clan?.bane && (
+                  <div className="mt-1">
+                    <button
+                      onClick={() => setShowClanBane(v => !v)}
+                      className="flex items-center gap-1 text-blood text-xs hover:text-red-400 transition-colors"
+                    >
+                      <span className={`transition-transform duration-200 ${showClanBane ? "rotate-90" : ""}`}>▶</span>
+                      <span className="font-gothic tracking-wider">Clan Bane</span>
+                    </button>
+                    {showClanBane && (
+                      <p className="mt-1 text-gray-300 text-xs leading-relaxed bg-black/30 rounded p-2 border border-blood/20">
+                        {character.clan.bane}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Predator Type</p>
-                <p className="text-gray-200 text-sm">{character.predator_type?.name ?? "—"}</p>
+                {character.predator_type?.name
+                  ? <p className="text-gray-200 text-sm">{character.predator_type.name}</p>
+                  : onAddPredatorType
+                    ? <button onClick={onAddPredatorType} className="text-blood text-xs hover:text-red-400 transition-colors font-gothic tracking-wider">+ Set Predator Type →</button>
+                    : <p className="text-gray-200 text-sm">—</p>
+                }
               </div>
               <div>
                 <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Generation</p>
@@ -1170,7 +1267,7 @@ export default function CharacterSheet({
                 <span className="text-blood">× aggravated</span>
               </p>
             </div>
-            <DamageTrack track={healthTrack} maxActive={character.health} onChange={setHT} />
+            <DamageTrack track={healthTrack} maxActive={effectiveHealth} onChange={setHT} />
           </div>
           <div className="bg-void-light border border-void-border rounded-lg p-4">
             <div className="flex justify-between items-center mb-3">
@@ -1181,7 +1278,7 @@ export default function CharacterSheet({
                 <span className="text-blood">× aggravated</span>
               </p>
             </div>
-            <DamageTrack track={wpTrack} maxActive={character.willpower} onChange={setWT} />
+            <DamageTrack track={wpTrack} maxActive={effectiveWillpower} onChange={setWT} />
           </div>
         </div>
 
@@ -1236,11 +1333,14 @@ export default function CharacterSheet({
         {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 3 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
         <div className="flex flex-wrap gap-6">
           <StatColumn heading="Physical" names={PHYSICAL_SKILLS} lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
+            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
           <StatColumn heading="Social"   names={SOCIAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
+            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
           <StatColumn heading="Mental"   names={MENTAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined} />
+            tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
         </div>
       </Section>
 
@@ -1562,7 +1662,11 @@ export default function CharacterSheet({
           <div className="mt-4 border-t border-void-border/40 pt-4">
             <button
               onClick={() => { setShowAddAdvantage((v) => !v); setAddAdvError(null); setAddAdvId(null); setAddAdvLevel(1); setAddAdvNotes(""); }}
-              className="text-xs text-gray-600 hover:text-blood transition-colors font-gothic tracking-wider"
+              className={`text-xs font-gothic tracking-wider px-3 py-1.5 rounded border transition-colors ${
+                showAddAdvantage
+                  ? "border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300"
+                  : "border-blood-dark/60 text-blood hover:bg-blood-dark/20 hover:border-blood"
+              }`}
             >
               {showAddAdvantage ? "✕ Cancel" : "+ Add Merit / Flaw / Background"}
             </button>

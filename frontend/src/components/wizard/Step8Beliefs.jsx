@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useWizardStore from "../../store/wizardStore";
+import { randomBeliefs } from "../../utils/wizardRandomize";
 
 export default function Step8Beliefs({ onNext, onBack }) {
   const { data, saveStep, error } = useWizardStore();
@@ -24,18 +25,31 @@ export default function Step8Beliefs({ onNext, onBack }) {
     setTenets(updated);
   };
 
-  const isValid = convictions.every((c) => c.conviction.trim() && c.touchstone.trim());
-
   const handleNext = async () => {
+    // Only save convictions that have both fields filled — partial ones are dropped
+    const filteredConvictions = convictions.filter((c) => c.conviction.trim() && c.touchstone.trim());
     const filteredTenets = tenets.filter((t) => t.trim());
-    const ok = await saveStep(7, { convictions, tenets: filteredTenets });  // backend step 7
+    const ok = await saveStep(7, { convictions: filteredConvictions, tenets: filteredTenets });
     if (ok) onNext();
   };
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Beliefs</h2>
-      <p className="text-gray-400 mb-6">What keeps you human? Convictions are the moral lines you won't cross. Touchstones are the people who anchor you.</p>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Beliefs</h2>
+        <button
+          onClick={() => {
+            const r = randomBeliefs();
+            setConvictions(r.convictions.length > 0 ? r.convictions : [{ conviction: "", touchstone: "" }]);
+            setTenets([""]);
+          }}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Suggest
+        </button>
+      </div>
+      <p className="text-gray-400 mb-2">What keeps you human? Convictions are the moral lines you won't cross. Touchstones are the people who anchor you.</p>
+      <p className="text-gray-600 text-xs mb-6">This step is optional — you can skip it and add convictions later from your character sheet.</p>
 
       {/* Convictions */}
       <div className="mb-6">
@@ -99,7 +113,7 @@ export default function Step8Beliefs({ onNext, onBack }) {
 
       <div className="mt-8 flex justify-between">
         <button onClick={onBack} className="vtm-btn-secondary">← Back</button>
-        <button onClick={handleNext} disabled={!isValid} className="vtm-btn">
+        <button onClick={handleNext} className="vtm-btn">
           Next: Humanity →
         </button>
       </div>

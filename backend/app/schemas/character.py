@@ -142,6 +142,7 @@ class Step9Data(BaseModel):
     chosen_discipline: Optional[str] = None   # e.g. "Oblivion" (overrides default discipline)
     chosen_specialty_skill: Optional[str] = None
     chosen_specialty_name: Optional[str] = None
+    chosen_flaw: Optional[str] = None         # e.g. "Shunned" (for types with a flaw choice)
 
 
 class Step10Data(BaseModel):
@@ -396,6 +397,8 @@ class DirectoryCharOut(BaseModel):
     generation: Optional[Generation]
     humanity: int
     blood_potency: int
+    is_retainer: bool = False
+    parent_character_name: Optional[str] = None
     class Config:
         from_attributes = True
 

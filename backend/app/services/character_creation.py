@@ -491,6 +491,22 @@ def build_character(user_id: int, draft: WizardDraft, db: Session) -> Character:
                 sa.value = min(5, sa.value + stamina_increase)
                 char.health = 3 + sa.value
 
+    # ── Predator type chosen flaw (for types with a flaw choice, e.g. Blood Leech / Scene Queen) ──
+    chosen_flaw_name = s9.get("chosen_flaw")
+    if predator_type and chosen_flaw_name:
+        flaw_obj = db.query(Flaw).filter(Flaw.name == chosen_flaw_name).first()
+        if flaw_obj:
+            already = db.query(CharacterFlaw).filter(
+                CharacterFlaw.character_id == char.id,
+                CharacterFlaw.flaw_id == flaw_obj.id,
+            ).first()
+            if not already:
+                db.add(CharacterFlaw(
+                    character_id=char.id,
+                    flaw_id=flaw_obj.id,
+                    notes="(Chosen via Predator Type)",
+                ))
+
     # ── Convictions & Tenets ──
     for c in s7.get("convictions", []):
         db.add(CharacterConviction(character_id=char.id, conviction=c["conviction"], touchstone=c["touchstone"]))

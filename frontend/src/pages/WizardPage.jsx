@@ -18,10 +18,15 @@ export default function WizardPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const addPredatorMode = !!location.state?.addPredatorMode;
+  const addPredatorCharId = location.state?.characterId ?? null;
+
   useEffect(() => {
     // Skip loading the old draft when the player is starting a new character.
     // resetDraft() already cleared the server draft and set local state to step 1.
     if (location.state?.isNew) return;
+    // When adding predator type to a complete character, jump straight to step 9.
+    if (addPredatorMode) { goToStep(9); return; }
     loadDraft();
   }, []);
 
@@ -41,7 +46,7 @@ export default function WizardPage() {
       {currentStep === 6  && <Step7Advantages onNext={next} onBack={back} />}
       {currentStep === 7  && <Step8Beliefs    onNext={next} onBack={back} />}
       {currentStep === 8  && <Step9Humanity   onNext={next} onBack={back} />}
-      {currentStep === 9  && <Step3Predator   onNext={next} onBack={back} />}
+      {currentStep === 9  && <Step3Predator   onNext={next} onBack={back} addPredatorMode={addPredatorMode} characterId={addPredatorCharId} />}
       {currentStep === 10 && <Step10Generation onBack={back} />}
     </WizardLayout>
   );

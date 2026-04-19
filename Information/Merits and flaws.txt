@@ -1,0 +1,285 @@
+MERITS AND FLAWS
+================================================================================
+
+LINGUISTICS
+Note: Each dot of Linguistics allows the character to read, write and speak
+fluently in another language outside of their default two (native language +
+language of the Domain).
+
+  MERITS
+  - Linguistics (• +)
+    Each dot grants fluency in one additional language (read, write, speak).
+
+  FLAWS
+  - Illiterate (••)
+    Cannot read or write. Science and Academics Skills may not exceed 1 dot.
+
+--------------------------------------------------------------------------------
+
+LOOKS
+Related to appearance, supernaturally influenced or not.
+
+  MERITS
+  - Beautiful (••)
+    Add one die to related Social pools.
+
+  - Stunning (••••)
+    Add two dice to related Social pools.
+
+  - Semblance of the Methuselah (• – ••)
+    Appearance strikingly similar to a methuselah. Gain one die on rolls to
+    impress, intimidate or attract attention from those who recognize the face.
+    May gain additional status or bonus dice when meeting the resembled methuselah.
+
+  - Famous Face (•)
+    Appear as someone famous. Gain two dice in social tests where this helps.
+    Take a two-dice penalty when trying to hide in a crowd or avoid recognition.
+
+  - Ingénue (•)
+    Appear innocent and blameless. Add two dice to rolls related to avoiding
+    suspicion or deflecting blame (Storyteller's discretion).
+
+  - Remarkable Feature (•)
+    Possess a rare, memorable feature (unusual eye color, complexion, etc.).
+    Add two dice to social interactions with strangers.
+    Take a one-die penalty to disguise yourself.
+
+  - Up All Night (•• or ••••)
+    Treat Humanity as one higher (max 10) when using Blush of Life, eating,
+    drinking, or sexual intercourse. At four dots, treat as two higher.
+
+  - Scene Kid (•)
+    Style embodies a particular subculture. Add one die to all appropriate
+    Social pools when dealing with that subculture.
+
+  FLAWS
+  - Ugly (•)
+    Lose one die from related Social pools.
+
+  - Repulsive (••)
+    Lose two dice from related Social pools.
+
+  - Stench (•)
+    Supernaturally foul breath and body odor. Lose one die from seduction and
+    similar Social pools. Lose two dice from Stealth pools unless upwind.
+
+  - Transparent (•)
+    Unable to lie due to terrible poker face or compulsion to be truthful.
+    Lose one die in pools requiring Subterfuge. Cannot take any Subterfuge dots.
+
+  - Unblinking Visage (••)
+    Treat Humanity as two lower (min 0) when using Blush of Life, eating,
+    drinking, or sexual intercourse.
+
+--------------------------------------------------------------------------------
+
+SUBSTANCE USE
+Vampires seek prey with a specific drug in their system (defined at character
+creation). Effects of specific substances still apply.
+
+  MERITS
+  - High Functioning Addict (•)
+    Add one die to either Physical, Social, or Mental pools when the last
+    feeding had the drug of their desire.
+
+  FLAWS
+  - Addiction (•)
+    Lose one die to all pools if the last feeding was not on the drug of choice,
+    unless the action is to immediately obtain that drug.
+
+  - Hopeless Addiction (••)
+    Lose two dice to all pools if the last feeding was not on the drug of choice,
+    unless the action is to immediately obtain that drug.
+
+--------------------------------------------------------------------------------
+
+ARCHAIC
+May only be taken by Ancilla or older vampires.
+
+  MERITS
+  - Custodian of History (•)
+    Gain +1 to all relevant Skill tests pertaining to a chosen period or
+    character in Kindred lore.
+
+  FLAWS
+  - Living in the Past (•)
+    Unable to grasp modern society's mindset. One or more convictions reflect
+    outdated views.
+
+  - Archaic (••)
+    Cannot use computers or cellphones. Technology rating is always 0.
+
+  - Grief Phobia (•)
+    Lose one die to all tests made while in the presence of a phobic stimulus
+    linked to a traumatically lost Touchstone.
+
+  - Old Tricks (•)
+    All specialties must be Archaic in nature.
+
+--------------------------------------------------------------------------------
+
+BONDING
+These can be combined to alter how the Blood Bond works.
+
+  MERITS
+  - Bond Resistance (• – •••)
+    Add one die per level to resist Blood Bonds.
+
+  - Short Bond (••)
+    Bonds decrease by two levels each month if not reinforced.
+
+  - Unbondable (•••••)
+    Cannot be Blood Bonded.
+
+  - Bonds of Fealty (•••)
+    Dominate powers do not require eye contact on those bound to the character.
+    Requires Dominate discipline.
+
+  - Enduring Bond (•)
+    Bonds the character creates last longer, weakening only every other month.
+
+  FLAWS
+  - Bond Junkie (•)
+    The bond is sweeter to this character. Lose one die when acting against
+    Blood Bonds.
+
+  - Long Bond (•)
+    Bonds fade slower, decreasing by one level every 3 months without
+    reinforcement.
+
+  - Bondslave (••)
+    Becomes Blood Bonded to another Kindred with just one drink, not three.
+
+  - Two Masters (•)  [Supernatural — from Blood Stained Love]
+    Can be Blood Bound to two individuals simultaneously.
+
+--------------------------------------------------------------------------------
+
+FEEDING
+Related to the act of feeding. Taking one does not require taking the others.
+
+  MERITS
+  - Bloodhound (•)
+    Can sniff out resonances without tasting the blood.
+
+  - Iron Gullet (•••)
+    Can consume rancid, defractionated, or otherwise undrinkable blood.
+
+  - Vessel Recognition (•)
+    With a Resolve + Awareness test (Difficulty 2), can tell if a mortal has
+    been fed on recently. A critical win reveals if the feeding is recurring
+    (possible herd member).
+
+  - Drive-thru (•)
+    Has mastered feeding on the move. Can complete a hunt safely within minutes
+    by increasing the difficulty by 1.
+
+  FLAWS
+  - Prey Exclusion (•)
+    Cannot feed from a specific group. Takes Stains as if breaking a Chronicle
+    Tenet when doing so.
+
+  - Methuselah's Thirst (•)
+    Hunger can only be slaked to 0 by supernatural blood.
+
+  - Farmer (••)
+    Must spend 2 Willpower Points to feed on human blood. Ventrue may not take this.
+
+  - Organovore (••)
+    Can only slake Hunger by consuming human flesh and organs.
+
+  - Vein Tapper (•)
+    Finds feeding to be deeply personal. Goes out of their way to feed from
+    unaware, drugged, or unconscious victims.
+
+  - Outdated Preference (••)
+    Must either capture and force mortals to adhere to their specific preference,
+    or always spend 1 Willpower to feed.
+
+  - Resonance Sensitivity (•)
+    One specific resonance triggers a unique compulsion in the character.
+
+  - Resonance Mimic (••)
+    Gets influenced and penalized by the memories of their victim.
+
+  - Sloppy Feeder (••)
+    Feeding pattern is distinctive enough to be identified. One attack can be
+    forensically linked to previous attacks.
+
+--------------------------------------------------------------------------------
+
+MYTHIC
+Related to vampire mythos.
+
+  MERITS
+  - Eat Food (••)
+    Can consume food (no nourishment). Must expel it before resting for the day.
+
+  - Cold Dead Hunger (•••)
+    Add two dice to resist Hunger frenzy.
+
+  - Pack Diablerie (••)
+    Always absorbs the soul during Diablerie unless choosing otherwise.
+    When assisting another in Diablerie, gains 5 XP to spend as if having
+    committed it personally.
+
+  - Luck of the Devil (••••)
+    Once per session, when misfortune occurs, redirect it toward someone close
+    to the character for them to take the fall instead.
+
+  - Nuit Mode (••)
+    Body does not revert to death-state each night. Can keep new haircuts and
+    body modifications. Can undo changes as if mending Aggravated damage.
+    Does not work for characters with Blood Potency higher than 1.
+
+  - Object of Power (• – •••)
+    Rare, powerful item with escalating benefits:
+    • Reroll one die per story (excluding Hunger dice).
+    •• Gain one bonus die to all Level 1 Ritual tests.
+    ••• Receive a free premonition warning once per session when someone
+        intends to cause harm.
+
+  - Ley Line Leach (•)
+    Follows ancient paths of power while traveling. After spending several hours
+    traveling to a new city or locale, negate the need for a Rouse Check for
+    the next night.
+
+  - Persistent Blush (•••)
+    A single activation of Blush of Life lasts 1 week.
+
+  - Corpse Flesh (•)
+    Unable to use Blush of Life.
+
+  FLAWS
+  - Folkloric Bane (•)
+    Takes Aggravated Damage when touching a specific object rooted in vampire
+    mythos (e.g., silver).
+
+  - Folkloric Block (•)
+    Must spend Willpower or move away from a specific object vampires are known
+    to fear in mythos (e.g., holy symbols).
+
+  - Stigmata (•)
+    Bleeds from wounds on the hands, feet, and forehead when at Hunger 4.
+
+  - Stake Bait (••)
+    When staked, the character meets Final Death.
+
+  - Starving Decay (••)
+    When Hunger is 3 or higher, body shrivels and decays. Take a two-dice
+    penalty to Physical tests and social interactions with mortals. Can risk
+    the Masquerade.
+
+  - Twice Cursed (••)
+    Take the clan's variant Bane in addition to the regular Bane. Storyteller
+    may prohibit this if the second Bane wouldn't fit the chronicle.
+
+  - Land Locked (•)
+    Cannot leave the land. Must make a Fear Frenzy test (Difficulty 3) to
+    board a boat or plane.
+
+  - Resistant Blush (•)
+    When rolling a Rouse Check for Blush of Life, roll twice and take the
+    lowest result.
+
+================================================================================

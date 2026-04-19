@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import useWizardStore from "../../store/wizardStore";
+import { randomDisciplines } from "../../utils/wizardRandomize";
 
 export default function Step6Disciplines({ onNext, onBack }) {
   const { data, saveStep, error } = useWizardStore();
@@ -25,7 +26,7 @@ export default function Step6Disciplines({ onNext, onBack }) {
     });
   };
 
-  // Load clan disciplines
+  // Load clan disciplines — also eagerly load all powers so Suggest can use them
   useEffect(() => {
     if (!clanId) return;
     api.get(`/api/game-data/clans/${clanId}`).then((r) => {
@@ -37,7 +38,12 @@ export default function Step6Disciplines({ onNext, onBack }) {
         });
       } else {
         setClanDisciplines(disciplines);
-        disciplines.forEach(loadPowers);
+        // Load all clan discipline powers upfront (needed for Suggest)
+        disciplines.forEach((disc) => {
+          api.get(`/api/game-data/disciplines/${disc.id}/powers`).then((pr) => {
+            setAllPowers((prev) => ({ ...prev, [disc.id]: pr.data.powers || [] }));
+          });
+        });
       }
     });
   }, [clanId]);
@@ -100,7 +106,20 @@ export default function Step6Disciplines({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Disciplines</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Disciplines</h2>
+        {clanDisciplines.length >= 2 && Object.keys(allPowers).length >= clanDisciplines.length && (
+          <button
+            onClick={() => {
+              const result = randomDisciplines(clanDisciplines, allPowers);
+              if (result) setSelections(result);
+            }}
+            className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+          >
+            ✦ Suggest
+          </button>
+        )}
+      </div>
 
       {isClanless ? (
         <p className="text-gray-400 mb-2">

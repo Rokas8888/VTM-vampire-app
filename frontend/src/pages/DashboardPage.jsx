@@ -730,6 +730,15 @@ export default function DashboardPage() {
                 c.id === updated.id ? { ...c, total_xp: updated.total_xp, spent_xp: updated.spent_xp } : c
               ));
             }}
+            onAddPredatorType={selected.is_retainer ? undefined : () => navigate("/wizard", { state: { addPredatorMode: true, characterId: selected.id } })}
+            onAddSpecialty={async (skillName, specialtyName) => {
+              const res = await api.post(`/api/characters/${selected.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName });
+              setSelected(res.data);
+            }}
+            onDeleteSpecialty={async (skillName, specialtyName) => {
+              const res = await api.delete(`/api/characters/${selected.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } });
+              setSelected(res.data);
+            }}
             onOpenRetainer={async (id) => {
               const [charRes, clansRes, predRes] = await Promise.all([
                 api.get(`/api/characters/${id}`),

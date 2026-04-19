@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import useWizardStore from "../../store/wizardStore";
+import { randomSkills } from "../../utils/wizardRandomize";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,22 @@ export default function Step5Skills({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Skills</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Skills</h2>
+        <button
+          onClick={() => {
+            const r = randomSkills();
+            setDistribution(r.distribution);
+            setSkills(r.skills);
+            setSpecialties(r.specialties);
+            setFreeSkill(r.freeSkill);
+            setFreeName(r.freeName);
+          }}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Suggest
+        </button>
+      </div>
       <p className="text-gray-400 mb-6">Choose a distribution style, then fill in your skill dots.</p>
 
       {/* Distribution picker */}

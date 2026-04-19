@@ -238,13 +238,22 @@ def get_my_characters(current_user: User = Depends(get_current_user), db: Sessio
 @router.get("/directory", response_model=list[DirectoryCharOut])
 def get_directory(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Browse all completed characters — visible to any logged-in user."""
-    return (
+    chars = (
         db.query(Character)
-        .options(joinedload(Character.clan))
+        .options(joinedload(Character.clan), joinedload(Character.parent_character))
         .filter(Character.status == CharacterStatus.complete)
         .order_by(Character.name)
         .all()
     )
+    # Attach parent character name for retainers (Pydantic reads from_attributes
+    # but parent_character_name is a derived field, so set it manually)
+    result = []
+    for c in chars:
+        out = DirectoryCharOut.model_validate(c)
+        if c.is_retainer and c.parent_character:
+            out.parent_character_name = c.parent_character.name
+        result.append(out)
+    return result
 
 
 @router.get("/{character_id}", response_model=CharacterOut)
@@ -773,6 +782,185 @@ def claim_predator_power(
         raise HTTPException(status_code=400, detail="Power already known.")
 
     db.add(CharacterPower(character_id=character_id, power_id=power_id))
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+# ── Set predator type post-wizard (for characters that skipped it) ────────────
+
+@router.post("/{character_id}/set-predator-type", response_model=CharacterOut)
+def set_predator_type(
+    character_id: int,
+    body: Step9Data,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply a predator type to a complete character that skipped it during the wizard."""
+    import json as _json
+    from app.models.game_data import PredatorType, Merit, Flaw, Background
+    from app.models.character import (
+        CharacterSpecialty, CharacterDiscipline, CharacterPower,
+        CharacterMerit, CharacterFlaw, CharacterBackground,
+    )
+
+    char = db.query(Character).filter(
+        Character.id == character_id,
+        Character.user_id == current_user.id,
+        Character.status == CharacterStatus.complete,
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    if char.predator_type_id:
+        raise HTTPException(status_code=400, detail="Character already has a predator type.")
+    if not body.predator_type_id:
+        raise HTTPException(status_code=400, detail="predator_type_id is required.")
+
+    pt = db.query(PredatorType).filter(PredatorType.id == body.predator_type_id).first()
+    if not pt:
+        raise HTTPException(status_code=404, detail="Predator type not found.")
+
+    char.predator_type_id = pt.id
+
+    # Free specialty
+    if pt.specialty_skill:
+        spec_skill = body.chosen_specialty_skill or pt.specialty_skill
+        spec_name  = body.chosen_specialty_name  or pt.specialty_name
+        if spec_skill and spec_name:
+            db.add(CharacterSpecialty(character_id=char.id, skill_name=spec_skill, specialty_name=spec_name))
+
+    # Free discipline dot
+    chosen_disc_name = body.chosen_discipline
+    if chosen_disc_name:
+        pt_disc = db.query(Discipline).filter(Discipline.name == chosen_disc_name).first()
+        pt_disc_id = pt_disc.id if pt_disc else None
+    else:
+        pt_disc_id = pt.discipline_id
+
+    if pt_disc_id:
+        existing = db.query(CharacterDiscipline).filter(
+            CharacterDiscipline.character_id == char.id,
+            CharacterDiscipline.discipline_id == pt_disc_id,
+        ).first()
+        if existing:
+            existing.level += 1
+        else:
+            db.add(CharacterDiscipline(character_id=char.id, discipline_id=pt_disc_id, level=pt.discipline_level or 1))
+
+    # Auto-granted backgrounds / merits / flaws
+    if pt.grants_json:
+        grants = _json.loads(pt.grants_json)
+
+        for grant_bg in grants.get("backgrounds", []):
+            bg_obj = db.query(Background).filter(Background.name == grant_bg["name"]).first()
+            if bg_obj:
+                existing_bg = db.query(CharacterBackground).filter(
+                    CharacterBackground.character_id == char.id,
+                    CharacterBackground.background_id == bg_obj.id,
+                ).first()
+                if existing_bg:
+                    existing_bg.level = min(5, existing_bg.level + grant_bg.get("level", 1))
+                else:
+                    db.add(CharacterBackground(character_id=char.id, background_id=bg_obj.id,
+                                               level=grant_bg.get("level", 1),
+                                               notes=grant_bg.get("notes") or "(Granted by Predator Type)"))
+
+        for grant_merit in grants.get("merits", []):
+            merit_obj = db.query(Merit).filter(Merit.name == grant_merit["name"]).first()
+            if merit_obj:
+                already = db.query(CharacterMerit).filter(CharacterMerit.character_id == char.id,
+                                                          CharacterMerit.merit_id == merit_obj.id).first()
+                if not already:
+                    db.add(CharacterMerit(character_id=char.id, merit_id=merit_obj.id,
+                                          level=grant_merit.get("level", 1),
+                                          notes="(Granted by Predator Type)"))
+
+        for grant_flaw in grants.get("flaws", []):
+            flaw_obj = db.query(Flaw).filter(Flaw.name == grant_flaw["name"]).first()
+            if flaw_obj:
+                already = db.query(CharacterFlaw).filter(CharacterFlaw.character_id == char.id,
+                                                         CharacterFlaw.flaw_id == flaw_obj.id).first()
+                if not already:
+                    db.add(CharacterFlaw(character_id=char.id, flaw_id=flaw_obj.id,
+                                         notes=grant_flaw.get("notes") or "(Granted by Predator Type)"))
+
+        special = grants.get("special", {})
+        if special.get("blood_potency"):
+            char.blood_potency = min(10, char.blood_potency + special["blood_potency"])
+
+    # Chosen flaw (Blood Leech / Scene Queen choice)
+    if body.chosen_flaw:
+        flaw_obj = db.query(Flaw).filter(Flaw.name == body.chosen_flaw).first()
+        if flaw_obj:
+            already = db.query(CharacterFlaw).filter(CharacterFlaw.character_id == char.id,
+                                                     CharacterFlaw.flaw_id == flaw_obj.id).first()
+            if not already:
+                db.add(CharacterFlaw(character_id=char.id, flaw_id=flaw_obj.id,
+                                     notes="(Chosen via Predator Type)"))
+
+    # Humanity modifier
+    if pt.humanity_modifier:
+        char.humanity = max(0, min(10, char.humanity + pt.humanity_modifier))
+
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+# ── Specialties ──────────────────────────────────────────────────────────────
+
+class SpecialtyAddRequest(BaseModel):
+    skill_name: str
+    specialty_name: str
+
+@router.post("/{character_id}/specialties", response_model=CharacterOut)
+def add_specialty(
+    character_id: int,
+    body: SpecialtyAddRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a specialty to a skill."""
+    from app.models.character import CharacterSpecialty
+    char = db.query(Character).filter(
+        Character.id == character_id,
+        Character.user_id == current_user.id,
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    if not body.skill_name.strip() or not body.specialty_name.strip():
+        raise HTTPException(status_code=400, detail="Skill name and specialty name are required.")
+    db.add(CharacterSpecialty(
+        character_id=character_id,
+        skill_name=body.skill_name.strip(),
+        specialty_name=body.specialty_name.strip(),
+    ))
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.delete("/{character_id}/specialties", response_model=CharacterOut)
+def delete_specialty(
+    character_id: int,
+    skill_name: str,
+    specialty_name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a specialty by skill + name."""
+    from app.models.character import CharacterSpecialty
+    char = db.query(Character).filter(
+        Character.id == character_id,
+        Character.user_id == current_user.id,
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    sp = db.query(CharacterSpecialty).filter(
+        CharacterSpecialty.character_id == character_id,
+        CharacterSpecialty.skill_name == skill_name,
+        CharacterSpecialty.specialty_name == specialty_name,
+    ).first()
+    if not sp:
+        raise HTTPException(status_code=404, detail="Specialty not found.")
+    db.delete(sp)
     db.commit()
     return load_full_character(char.id, db)
 

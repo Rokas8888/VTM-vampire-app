@@ -28,7 +28,15 @@ export default function Step9Humanity({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Humanity</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Humanity</h2>
+        <button
+          onClick={() => setHumanity(7)}
+          className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+        >
+          ✦ Reset to 7
+        </button>
+      </div>
       <p className="text-gray-400 mb-6">
         Humanity measures how close you remain to your mortal self. High Humanity means you still feel, still care.
         Low Humanity means the Beast is winning.

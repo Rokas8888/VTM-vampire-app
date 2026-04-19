@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import useWizardStore from "../../store/wizardStore";
+import { randomClan } from "../../utils/wizardRandomize";
 
 export default function Step2Clan({ onNext, onBack }) {
   const { data, saveStep, error } = useWizardStore();
@@ -19,7 +20,17 @@ export default function Step2Clan({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="font-gothic text-3xl text-blood mb-2">Choose Your Clan</h2>
+      <div className="flex justify-between items-start mb-2">
+        <h2 className="font-gothic text-3xl text-blood">Choose Your Clan</h2>
+        {clans.length > 0 && (
+          <button
+            onClick={() => setSelected(randomClan(clans))}
+            className="text-xs border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors rounded px-3 py-1.5 font-gothic tracking-wider shrink-0"
+          >
+            ✦ Suggest
+          </button>
+        )}
+      </div>
       <p className="text-gray-400 mb-6">Your clan defines your disciplines, bane, and place in Kindred society. Click a clan to learn more.</p>
 
       <div className="grid grid-cols-2 gap-3">

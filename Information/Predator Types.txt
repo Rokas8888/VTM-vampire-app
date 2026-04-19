@@ -1,0 +1,487 @@
+PREDATOR TYPES — Vampire: The Masquerade 5th Edition
+======================================================
+All 18 canonical predator types, their bonuses, penalties, and choices.
+
+
+──────────────────────────────────────────────────────────────────────────────
+ALLEYCAT
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You feed by brute force and outright attack, taking blood from whoever you can
+when you can. Violence is the quickest route — intimidation makes victims cower,
+and Dominate masks the assault.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Celerity (Supernatural speed)
+    +1 Potence (Supernatural strength)
+
+  SPECIALTY (choose one):
+    Intimidation: Stickups
+    Brawl: Grappling
+
+  ADVANTAGES:
+    Three dots of Criminal Contacts
+
+  FLAWS:
+    Lose one dot of Humanity.
+
+  HUMANITY MODIFIER: -1
+
+
+──────────────────────────────────────────────────────────────────────────────
+BAGGER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You consume preserved, defractionated or rancid blood through Iron Gullet —
+blood bags, corpses, black-market stock. Maybe you work in a hospital or know
+the right people. Ventrue cannot take this style.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Blood Sorcery (Tremere / Banu Haqim only)
+    +1 Oblivion (Hecata only)
+    +1 Obfuscate (Mental misdirection)
+
+  SPECIALTY (choose one):
+    Larceny: Lock Picking
+    Streetwise: Black Market
+
+  ADVANTAGES:
+    Iron Gullet Merit (•••)
+
+  FLAWS:
+    Enemy (••) — someone believes you owe them, or hunts you.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+BLOOD LEECH
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You reject mortal blood and feed upon the vitae of other vampires through
+hunting those weaker than you, coercion, or taking blood as payment. This
+practice is not looked upon kindly.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Celerity (Supernatural speed)
+    +1 Protean (Shapeshifting)
+
+  SPECIALTY (choose one):
+    Brawl: Kindred
+    Stealth: Against Kindred
+
+  ADVANTAGES:
+    Blood Potency +1
+
+  FLAWS (choose one):
+    Dark Secret: Diablerist (••)
+    Shunned (••)
+  ADDITIONAL FLAW (automatic):
+    Prey Exclusion: Mortals (••)
+
+  HUMANITY MODIFIER: -1
+
+
+──────────────────────────────────────────────────────────────────────────────
+CLEAVER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You covertly take blood from close friends and family while maintaining
+relationships with them. You go to extreme lengths to keep your condition
+secret — or take less pleasant routes.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Dominate (Mental domination)
+    +1 Animalism (Control over beasts)
+
+  SPECIALTY (choose one):
+    Persuasion: Gaslighting
+    Subterfuge: Coverups
+
+  ADVANTAGES:
+    Herd (••)
+
+  FLAWS:
+    Dark Secret: Cleaver (•) — your human family does not know what you are.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+CONSENSUALIST
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You never feed against a victim's free will — posing as a charity blood drive,
+someone with a blood kink, or even admitting the truth and getting permission.
+The last method is a Masquerade breach.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Auspex (Supernatural senses)
+    +1 Fortitude (Supernatural resilience)
+
+  SPECIALTY (choose one):
+    Medicine: Phlebotomy
+    Persuasion: Vessels
+
+  ADVANTAGES:
+    Gain one dot of Humanity.
+
+  FLAWS:
+    Dark Secret: Masquerade Breacher (•)
+    Prey Exclusion: Non-consenting (•)
+
+  HUMANITY MODIFIER: +1
+
+
+──────────────────────────────────────────────────────────────────────────────
+EXTORTIONIST
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You acquire blood in exchange for services — protection, security, surveillance.
+For as many times as the service is genuine, there are many times when it is
+fabricated to make the deal sweeter.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Dominate (Mental domination)
+    +1 Potence (Supernatural strength)
+
+  SPECIALTY (choose one):
+    Intimidation: Coercion
+    Larceny: Security
+
+  ADVANTAGES:
+    Three dots split between Contacts and Resources.
+
+  FLAWS:
+    Enemy (••) — the police or a victim who escaped and wants revenge.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+FARMER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You feed exclusively from animals. The Beast gnaws at you with hunger, but you
+have successfully avoided killing mortals except on bad nights. Unavailable to
+Ventrue or characters with Blood Potency 3+.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Animalism (Control over beasts)
+    +1 Protean (Shapeshifting)
+
+  SPECIALTY (choose one):
+    Animal Ken: Specific animal (choose)
+    Survival: Hunting
+
+  ADVANTAGES:
+    Gain one dot of Humanity.
+
+  FLAWS:
+    Farmer (••) — you cannot feed on humans without strong provocation.
+
+  HUMANITY MODIFIER: +1
+
+
+──────────────────────────────────────────────────────────────────────────────
+GRIM REAPER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You hunt inside hospice care facilities and assisted living homes, feeding from
+those near the end of their lives. Constantly on the move to locate new victims,
+you may develop a taste for specific diseases.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Auspex (Supernatural senses)
+    +1 Oblivion (Command over darkness and death)
+
+  SPECIALTY (choose one):
+    Awareness: Death
+    Larceny: Forgery
+
+  ADVANTAGES:
+    One dot of Allies (Medical community — doctor, nurse, or orderly).
+    Gain one dot of Humanity.
+
+  FLAWS:
+    Prey Exclusion: Healthy Mortals (•) — you cannot feed from those not near death.
+
+  HUMANITY MODIFIER: +1
+
+
+──────────────────────────────────────────────────────────────────────────────
+GRAVEROBBER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+Similar to Baggers, you understand there is no good in wasting blood. You dig up
+corpses or work in mortuaries — but often prefer feeding from grieving mourners
+at gravesites or hospitals.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Fortitude (Supernatural resilience)
+    +1 Oblivion (Command over darkness and death)
+
+  SPECIALTY (choose one):
+    Occult: Grave Rituals
+    Medicine: Cadavers
+
+  ADVANTAGES:
+    Iron Gullet (•••), Haven (•)
+
+  FLAWS:
+    Obvious Predator (••) — something about you screams death to mortals.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+MONTERO
+──────────────────────────────────────────────────────────────────────────────
+Description:
+Carrying on the aristocratic Spanish tradition of hunting, your retainers drive
+victims towards you. This takes the form of long cons, flash mobs, or gang
+pursuits — expert planning, patient waiting.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Dominate (Mental domination)
+    +1 Obfuscate (Invisibility and misdirection)
+
+  SPECIALTY (choose one):
+    Leadership: Hunting Pack
+    Stealth: Stakeout
+
+  ADVANTAGES:
+    Two dots of Retainers.
+
+  FLAWS:
+    Lose one dot of Humanity.
+
+  HUMANITY MODIFIER: -1
+
+
+──────────────────────────────────────────────────────────────────────────────
+OSIRIS
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You are a celebrity, cult leader, musician, writer, or priest. Your followers
+come to you willingly, offering blood as tribute. Easy access to blood — but
+followers attract their own problems.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Blood Sorcery (Tremere / Banu Haqim only)
+    +1 Presence (Supernatural charisma)
+
+  SPECIALTY (choose one):
+    Occult: Specific tradition (choose)
+    Performance: Specific entertainment field (choose)
+
+  ADVANTAGES:
+    Three dots split between Fame and Herd backgrounds.
+
+  FLAWS:
+    Two dots split between Enemies and Mythic flaws.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+PURSUER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You stalk your victim, learning their habits and routines, determining whether
+they will cause an outcry if they disappear. You strike when the time is right
+and hunger is at a perfect balance.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Animalism (Control over beasts)
+    +1 Auspex (Supernatural senses)
+
+  SPECIALTY (choose one):
+    Investigation: Profiling
+    Stealth: Shadowing
+
+  ADVANTAGES:
+    Bloodhound Merit (•), one dot of Contacts (morally flexible locals).
+
+  FLAWS:
+    Lose one dot of Humanity.
+
+  HUMANITY MODIFIER: -1
+
+
+──────────────────────────────────────────────────────────────────────────────
+ROADSIDE KILLER
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You are always on the move, hunting those who will not be missed alongside the
+road. Roadside Killers know the risk is just as worth as the reward — you never
+stay in one spot for long.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Fortitude (Supernatural resilience)
+    +1 Protean (Shapeshifting)
+
+  SPECIALTY (choose one):
+    Survival: The Road
+    Investigation: Vampire Cant
+
+  ADVANTAGES:
+    Two dots of migrating Herd (across multiple cities).
+
+  FLAWS:
+    Prey Exclusion: Locals (•) — you struggle to feed on people with roots in a community.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+SANDMAN
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You hunt sleeping mortals, gliding through bedrooms like a nightmare. Using
+stealth or Disciplines you feed without ever waking your victim — though being
+caught means serious problems.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Auspex (Supernatural senses)
+    +1 Obfuscate (Invisibility and misdirection)
+
+  SPECIALTY (choose one):
+    Medicine: Anesthetics
+    Stealth: Break-in
+
+  ADVANTAGES:
+    One dot of Resources.
+
+  FLAWS:
+    Prey Exclusion: Awake victims (•) — feeding on a conscious person triggers Stains.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+SCENE QUEEN
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You hunt within a subculture you likely belonged to in life — street culture,
+high fashion, underground music. Your victims adore your status and disbelieve
+those who suspect the truth.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Dominate (Mental domination)
+    +1 Potence (Supernatural strength)
+
+  SPECIALTY (choose one):
+    Etiquette: Specific scene (choose)
+    Leadership: Specific scene (choose)
+    Streetwise: Specific scene (choose)
+
+  ADVANTAGES:
+    Fame (•), Contacts (•)
+
+  FLAWS (choose one):
+    Disliked (•) — outside your subculture
+    Prey Exclusion (•) — a different subculture
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+SIREN
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You feed while feigning sex or sexual interest, using Disciplines and seduction
+to lure prey. Moving through clubs and one-night stands are skills you have
+mastered.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Fortitude (Supernatural resilience)
+    +1 Presence (Supernatural charisma)
+
+  SPECIALTY (choose one):
+    Persuasion: Seduction
+    Subterfuge: Seduction
+
+  ADVANTAGES:
+    Beautiful Merit (••) [Striking Looks ••]
+
+  FLAWS:
+    Enemy (•) — a spurned lover or jealous partner.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+TITHE COLLECTOR
+──────────────────────────────────────────────────────────────────────────────
+Description:
+You hold enough power that other Kindred pay tribute in the form of specially
+selected vessels, delivered regularly or upon request. The vessels must be kept
+in reasonable condition — the Masquerade is everyone else's problem.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Dominate (Mental domination)
+    +1 Presence (Supernatural charisma)
+
+  SPECIALTY (choose one):
+    Intimidation: Kindred
+    Leadership: Kindred
+
+  ADVANTAGES:
+    Three dots of Domain or Status.
+
+  FLAWS:
+    Adversary (••) — a rival who disputes your claim.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+TRAPDOOR
+──────────────────────────────────────────────────────────────────────────────
+Description:
+Much like the spider, you build a nest and lure prey inside — an amusement park,
+an abandoned house, an underground club. The victim comes to you. Then you play
+with their mind, imprison them, or take a deep drink and send them home.
+
+  DISCIPLINE BONUS (choose one):
+    +1 Protean (Shapeshifting)
+    +1 Obfuscate (Invisibility and misdirection)
+
+  SPECIALTY (choose one):
+    Persuasion: Marketing
+    Stealth: Ambushes or Traps
+
+  ADVANTAGES:
+    One dot of Haven, plus one dot of Retainers or Herd (or a second Haven dot).
+
+  FLAWS:
+    Haven Flaw: Creepy (•) or Haunted (•) — your lair unsettles all who enter.
+
+  HUMANITY MODIFIER: 0
+
+
+──────────────────────────────────────────────────────────────────────────────
+QUICK REFERENCE TABLE
+──────────────────────────────────────────────────────────────────────────────
+
+Name              | Humanity | Disciplines (choose)           | Key Benefit
+------------------|----------|-------------------------------|----------------------------------
+Alleycat          |    -1    | Celerity or Potence           | 3 Criminal Contacts
+Bagger            |    0     | Blood Sorcery/Oblivion/Obfus. | Iron Gullet •••
+Blood Leech       |    -1    | Celerity or Protean           | Blood Potency +1
+Cleaver           |    0     | Dominate or Animalism         | Herd ••
+Consensualist     |    +1    | Auspex or Fortitude           | +1 Humanity
+Extortionist      |    0     | Dominate or Potence           | 3 Contacts/Resources
+Farmer            |    +1    | Animalism or Protean          | +1 Humanity
+Grim Reaper       |    +1    | Auspex or Oblivion            | +1 Humanity + Allies
+Graverobber       |    0     | Fortitude or Oblivion         | Iron Gullet •••, Haven •
+Montero           |    -1    | Dominate or Obfuscate         | Retainers ••
+Osiris            |    0     | Blood Sorcery or Presence     | Fame + Herd (3 dots)
+Pursuer           |    -1    | Animalism or Auspex           | Bloodhound •, Contacts •
+Roadside Killer   |    0     | Fortitude or Protean          | Herd •• (migrating)
+Sandman           |    0     | Auspex or Obfuscate           | Resources •
+Scene Queen       |    0     | Dominate or Potence           | Fame •, Contacts •
+Siren             |    0     | Fortitude or Presence         | Striking Looks ••
+Tithe Collector   |    0     | Dominate or Presence          | Status •••
+Trapdoor          |    0     | Protean or Obfuscate          | Haven •
