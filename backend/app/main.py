@@ -9,8 +9,8 @@ app = FastAPI(title="VTM-GG API", version="1.0.0")
 # Allow the frontend (running on port 5173) to talk to the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://192.168.0.110:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
