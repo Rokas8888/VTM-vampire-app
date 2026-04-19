@@ -242,6 +242,12 @@ function PowerCard({ power }) {
 const RITUAL_DISC_NAMES = ["Blood Sorcery"];
 
 function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove, availableXp, onClaimFreePower, tempDots, onAddTempDot, onRemoveTempDot, freeEdit, onRemoveDiscipline, learnedRituals = [], onOpenRitualBook }) {
+  const [expandedRituals, setExpandedRituals] = useState(new Set());
+  const toggleRitual = (id) => setExpandedRituals(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
   const disc        = cd.discipline;
   const allPowers   = disc.powers ?? [];
   const newLevel    = cd.level + 1;
@@ -482,15 +488,15 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
       {/* ── Rituals / Ceremonies (Blood Sorcery & Oblivion only) ── */}
       {RITUAL_DISC_NAMES.includes(disc.name) && (
         <div className="mt-3 pt-3 border-t border-void-border/40">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 mb-2">
             <p className="text-xs text-gray-500 uppercase tracking-widest font-gothic">
               {disc.name === "Oblivion" ? "Ceremonies" : "Rituals"}
             </p>
             <button
               onClick={onOpenRitualBook}
-              className="flex items-center gap-1 text-xs text-blood-dark hover:text-blood border border-blood-dark/40 hover:border-blood/60 rounded px-2 py-0.5 transition-colors font-gothic tracking-wide"
+              className="flex items-center gap-1 text-xs bg-blood/20 hover:bg-blood/40 text-blood hover:text-white border border-blood/50 hover:border-blood rounded px-2 py-0.5 transition-colors font-gothic tracking-wide"
             >
-              📖 Ritual Book
+              📓 Ritual Book
               {learnedRituals.length === 0 && (
                 <span className="text-yellow-500" title="Free ritual to claim!">⚠</span>
               )}
@@ -500,12 +506,34 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
             <p className="text-gray-700 text-xs italic">No {disc.name === "Oblivion" ? "ceremonies" : "rituals"} learned.</p>
           ) : (
             <div className="space-y-0.5">
-              {learnedRituals.map(cr => (
-                <div key={cr.id} className="flex items-center gap-2 text-xs">
-                  <span className="text-blood-dark w-12 shrink-0">{"●".repeat(cr.ritual.level)}</span>
-                  <span className="text-gray-400">{cr.ritual.name}</span>
-                </div>
-              ))}
+              {learnedRituals.map(cr => {
+                const isOpen = expandedRituals.has(cr.id);
+                const hasDetail = !!(cr.ritual.description || cr.ritual.system_text);
+                return (
+                  <div key={cr.id}>
+                    <div
+                      className={`flex items-center gap-2 text-xs rounded px-1 py-0.5 transition-colors ${hasDetail ? "cursor-pointer hover:bg-white/5" : ""}`}
+                      onClick={() => hasDetail && toggleRitual(cr.id)}
+                    >
+                      <span className="text-blood-dark w-12 shrink-0">{"●".repeat(cr.ritual.level)}</span>
+                      <span className="text-gray-300 flex-1">{cr.ritual.name}</span>
+                      {hasDetail && (
+                        <span className="text-gray-600 text-[10px] shrink-0">{isOpen ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                    {isOpen && (
+                      <div className="ml-14 mb-1 space-y-1 border-l border-blood-dark/30 pl-2 py-1">
+                        {cr.ritual.description && (
+                          <p className="text-gray-400 text-[11px] italic leading-relaxed">{cr.ritual.description}</p>
+                        )}
+                        {cr.ritual.system_text && (
+                          <p className="text-gray-300 text-[11px] leading-relaxed whitespace-pre-line">{cr.ritual.system_text}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -597,13 +625,8 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
                 )
               ) : null}
 
-              {/* Regular dots + colored temp dots */}
-              <DotRating value={val + tempVal} max={5} size="text-sm" />
-              {tempVal < 0 && (
-                <span className="text-red-500 text-sm tracking-widest ml-0.5">
-                  {"●".repeat(-tempVal)}
-                </span>
-              )}
+              {/* Dots: permanent filled, blue temp bonus, or dim × for excluded — all inside track */}
+              <DotRating value={val} tempValue={tempVal} max={5} size="text-sm" />
 
               {/* Raise improve / temp add */}
               {onImprove ? (
@@ -844,7 +867,8 @@ export default function CharacterSheet({
   const [ritualLevelFilter, setRitualLevelFilter] = useState([]); // [] = all
   const [ritualInfoId, setRitualInfoId] = useState(null);
   const [ritualError, setRitualError] = useState(null);
-  const [ritualPage, setRitualPage] = useState(0);
+  const [ritualPage, setRitualPage] = useState(0);       // which level index (0–4)
+  const [ritualSubPage, setRitualSubPage] = useState(0); // pagination within a level
 
   const [showAddAdvantage, setShowAddAdvantage] = useState(false);
   const [showPickerModal, setShowPickerModal] = useState(false);
@@ -2274,154 +2298,242 @@ export default function CharacterSheet({
         const learnedIds = new Set((character.rituals || []).map(cr => cr.ritual.id));
         const discForBook = ritualDiscs.find(cd => cd.discipline.id === ritualBookDiscId);
 
-        // Filter rituals for this discipline only
-        console.log("ritualBook debug:", { allRitualsCount: allRituals.length, ritualBookDiscId, sample: allRituals[0] });
-        let filtered = allRituals.filter(r => r.discipline_id === ritualBookDiscId);
-        if (ritualSearch) filtered = filtered.filter(r =>
+        // All rituals for this discipline, filtered by search
+        let allFiltered = allRituals.filter(r => r.discipline_id === ritualBookDiscId);
+        if (ritualSearch) allFiltered = allFiltered.filter(r =>
           r.name.toLowerCase().includes(ritualSearch.toLowerCase()) ||
           (r.description || "").toLowerCase().includes(ritualSearch.toLowerCase())
         );
-        if (ritualLevelFilter.length > 0) filtered = filtered.filter(r => ritualLevelFilter.includes(r.level));
 
-        // Split into two pages — left: levels 1-3, right: levels 4-5 (or half-half)
-        const ITEMS_PER_PAGE = 6;
-        const totalPages = Math.ceil(filtered.length / (ITEMS_PER_PAGE * 2));
-        const pageStart = ritualPage * ITEMS_PER_PAGE * 2;
-        const leftPage  = filtered.slice(pageStart, pageStart + ITEMS_PER_PAGE);
-        const rightPage = filtered.slice(pageStart + ITEMS_PER_PAGE, pageStart + ITEMS_PER_PAGE * 2);
-
-        const discName = discForBook?.discipline.name ?? "";
+        const discName  = discForBook?.discipline.name ?? "";
         const bookTitle = discName === "Oblivion" ? "Book of Night" : "Liber Sanguinis";
 
-        const RitualEntry = ({ r }) => {
-          const learned = learnedIds.has(r.id);
-          const canLearn = discForBook && discForBook.level >= r.level;
+        // ritualPage = current level (1–5); clamp to levels that actually exist
+        const existingLevels = [...new Set(allRituals.filter(r => r.discipline_id === ritualBookDiscId).map(r => r.level))].sort();
+        const currentLevel   = existingLevels[ritualPage] ?? existingLevels[0] ?? 1;
+
+        // Left page — rituals at current level matching search, paginated
+        const ITEMS_PER_SUBPAGE = 10;
+        const levelRituals    = allFiltered.filter(r => r.level === currentLevel);
+        const totalSubPages   = Math.ceil(levelRituals.length / ITEMS_PER_SUBPAGE);
+        const subPageStart    = ritualSubPage * ITEMS_PER_SUBPAGE;
+        const visibleRituals  = levelRituals.slice(subPageStart, subPageStart + ITEMS_PER_SUBPAGE);
+
+        // Right page — selected ritual detail
+        const selectedRitual = ritualInfoId ? allFiltered.find(r => r.id === ritualInfoId) ?? null : null;
+
+        // Left page — compact list row
+        const ListEntry = ({ r }) => {
+          const learned   = learnedIds.has(r.id);
+          const canLearn  = discForBook && discForBook.level >= r.level;
           const alreadyHasLvl1 = r.level === 1 && (character.rituals || []).some(cr =>
             cr.ritual.discipline_id === r.discipline_id && cr.ritual.level === 1
           );
           const xpCost = (r.level === 1 && !alreadyHasLvl1) ? 0 : r.level * 3;
-          const hasXp = freeEdit || availableXp >= xpCost;
-          const isExpanded = ritualInfoId === r.id;
+          const hasXp  = freeEdit || availableXp >= xpCost;
+          const isSelected = ritualInfoId === r.id;
+
           return (
-            <div className={`mb-3 pb-3 border-b border-amber-900/20 last:border-0 ${learned ? "opacity-90" : ""}`}>
-              <div className="flex items-start gap-1.5">
-                <span className="text-amber-800 text-[10px] mt-0.5 shrink-0 w-10">{"●".repeat(r.level)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className={`text-sm font-gothic leading-tight ${learned ? "text-amber-600" : "text-amber-900"}`}>{r.name}</span>
-                    {learned && <span className="text-[10px] text-amber-700 italic">✓ known</span>}
-                  </div>
-                  {isExpanded && (
-                    <div className="mt-1 space-y-1">
-                      {r.description && <p className="text-amber-950/80 text-[11px] italic leading-snug">{r.description}</p>}
-                      {r.system_text && <p className="text-amber-900/70 text-[11px] leading-snug">{r.system_text}</p>}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => setRitualInfoId(isExpanded ? null : r.id)}
-                    className="text-amber-800/50 hover:text-amber-700 text-xs" title="Details">ℹ</button>
-                  {learned ? (
-                    (onImprove || freeEdit) && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const res = await api.delete(`/api/characters/${character.id}/rituals/${r.id}`);
-                            if (onCharacterUpdate) onCharacterUpdate(res.data);
-                          } catch {}
-                        }}
-                        className="text-amber-900/40 hover:text-red-700 text-xs" title="Unlearn">✕</button>
-                    )
-                  ) : (
-                    <button
-                      disabled={!canLearn || !hasXp}
-                      onClick={async () => {
-                        setRitualError(null);
-                        try {
-                          const res = await api.post(`/api/characters/${character.id}/rituals/${r.id}`);
-                          if (onCharacterUpdate) onCharacterUpdate(res.data);
-                        } catch (e) { setRitualError(e.response?.data?.detail || "Failed."); }
-                      }}
-                      className="text-[10px] border border-amber-800/50 text-amber-800 hover:bg-amber-900/20 rounded px-1 py-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      title={!canLearn ? `Need ${discName} level ${r.level}` : !hasXp ? `Need ${xpCost} XP` : ""}
-                    >{xpCost === 0 ? "Free" : `${xpCost}xp`}</button>
-                  )}
-                </div>
-              </div>
+            <div
+              onClick={() => setRitualInfoId(isSelected ? null : r.id)}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors mb-0.5 ${
+                isSelected ? "bg-blood-dark/30 border border-blood-dark/50" : "hover:bg-white/5 border border-transparent"
+              }`}
+            >
+              <span className="text-blood/60 text-[9px] shrink-0 w-8">{"●".repeat(r.level)}</span>
+              <span className={`flex-1 text-xs font-gothic leading-tight truncate ${learned ? "text-blood" : "text-white"}`}>
+                {r.name}
+              </span>
+              {learned ? (
+                <span className="text-[9px] text-blood/50 shrink-0">✓</span>
+              ) : (
+                <button
+                  disabled={!canLearn || !hasXp}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setRitualError(null);
+                    try {
+                      const res = await api.post(`/api/characters/${character.id}/rituals/${r.id}`);
+                      if (onCharacterUpdate) onCharacterUpdate(res.data);
+                    } catch (err) { setRitualError(err.response?.data?.detail || "Failed."); }
+                  }}
+                  className="shrink-0 text-[10px] bg-blood hover:bg-red-600 text-white font-gothic rounded px-1.5 py-0.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title={!canLearn ? `Need ${discName} level ${r.level}` : !hasXp ? `Need ${xpCost} XP` : "Learn"}
+                >{xpCost === 0 ? "Free" : `${xpCost}xp`}</button>
+              )}
             </div>
           );
         };
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4" onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }}>
             <div className="flex flex-col w-full max-w-4xl" onClick={e => e.stopPropagation()}>
 
               {/* Book title */}
-              <h2 className="font-gothic text-center text-amber-600/80 tracking-[0.3em] uppercase text-sm mb-2">{bookTitle}</h2>
+              <h2 className="font-gothic text-center text-blood/70 tracking-[0.3em] uppercase text-sm mb-2 drop-shadow-lg">{bookTitle}</h2>
 
               {/* Filter bar */}
               <div className="flex gap-2 items-center mb-2 flex-wrap justify-center">
                 <input
                   autoFocus
                   value={ritualSearch}
-                  onChange={e => { setRitualSearch(e.target.value); setRitualPage(0); }}
-                  placeholder="Search…"
-                  className="bg-amber-950/60 border border-amber-800/40 text-amber-200 placeholder-amber-800/60 rounded px-3 py-1 text-sm w-44 focus:outline-none focus:border-amber-600"
+                  onChange={e => { setRitualSearch(e.target.value); setRitualInfoId(null); setRitualSubPage(0); }}
+                  placeholder="Search rituals…"
+                  className="bg-black/60 border border-blood-dark/40 text-gray-300 placeholder-gray-700 rounded px-3 py-1 text-sm w-48 focus:outline-none focus:border-blood/60"
                 />
-                <div className="flex gap-1">
-                  {[1,2,3,4,5].map(lvl => (
-                    <button key={lvl}
-                      onClick={() => {
-                        setRitualLevelFilter(prev => prev.includes(lvl) ? prev.filter(l => l !== lvl) : [...prev, lvl]);
-                        setRitualPage(0);
-                      }}
-                      className={`w-7 h-7 rounded text-xs font-gothic border transition-colors ${ritualLevelFilter.includes(lvl) ? "bg-amber-800 border-amber-600 text-amber-100" : "border-amber-900/40 text-amber-800/60 hover:border-amber-700"}`}
-                    >{lvl}</button>
-                  ))}
-                  {ritualLevelFilter.length > 0 && (
-                    <button onClick={() => setRitualLevelFilter([])} className="text-amber-800/50 hover:text-amber-600 text-xs px-1">✕</button>
-                  )}
-                </div>
-                <button onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }} className="ml-auto text-amber-800/50 hover:text-amber-400 text-lg leading-none">✕</button>
+                <button onClick={() => { setShowRitualBook(false); setRitualInfoId(null); }} className="ml-auto text-gray-700 hover:text-blood text-lg leading-none transition-colors">✕</button>
               </div>
 
               {/* Book spread */}
               <div className="flex shadow-2xl" style={{ minHeight: "520px" }}>
                 {/* Left cover edge */}
-                <div className="w-4 rounded-l-sm" style={{ background: "linear-gradient(to right, #1a0a00, #3d1a00)" }} />
-                {/* Left page */}
-                <div className="flex-1 overflow-y-auto p-6" style={{ background: "linear-gradient(135deg, #f5e6c8 0%, #ede0b8 50%, #e8d8a8 100%)", borderRight: "2px solid #6b3a1f" }}>
-                  <p className="text-center text-amber-900/50 text-[10px] uppercase tracking-widest font-gothic mb-4 border-b border-amber-900/20 pb-2">
+                <div className="w-5 rounded-l" style={{ background: "linear-gradient(to right, #050202, #120508, #1a0808)" }} />
+
+                {/* Left page — ritual list for current level with sub-pagination */}
+                <div className="flex-1 flex flex-col p-4" style={{ background: "linear-gradient(160deg, #0e0608 0%, #130a0a 60%, #0a0404 100%)", borderRight: "2px solid #3d0808" }}>
+                  <p className="text-center text-blood/40 text-[10px] uppercase tracking-widest font-gothic mb-1">
                     {discName === "Oblivion" ? "Ceremonies of the Dead" : "Rites of Blood"}
                   </p>
-                  {leftPage.length === 0 ? (
-                    <p className="text-amber-900/30 text-xs italic text-center mt-8">No entries.</p>
-                  ) : leftPage.map(r => <RitualEntry key={r.id} r={r} />)}
+                  <p className="text-center text-blood/60 text-xs font-gothic mb-3 border-b border-blood-dark/20 pb-2">
+                    Level {currentLevel}
+                  </p>
+
+                  {/* Ritual rows */}
+                  <div className="flex-1">
+                    {visibleRituals.length === 0 ? (
+                      <p className="text-gray-700 text-xs italic text-center mt-8">No rituals found.</p>
+                    ) : visibleRituals.map(r => <ListEntry key={r.id} r={r} />)}
+                  </div>
+
+                  {/* Sub-page controls inside left page */}
+                  {totalSubPages > 1 && (
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-blood-dark/20">
+                      <button
+                        disabled={ritualSubPage === 0}
+                        onClick={() => setRitualSubPage(p => p - 1)}
+                        className="text-gray-400 hover:text-blood disabled:opacity-20 text-xs font-gothic transition-colors"
+                      >← Prev</button>
+                      <span className="text-gray-400 text-[10px] font-gothic">
+                        {ritualSubPage + 1} / {totalSubPages}
+                      </span>
+                      <button
+                        disabled={ritualSubPage >= totalSubPages - 1}
+                        onClick={() => setRitualSubPage(p => p + 1)}
+                        className="text-gray-400 hover:text-blood disabled:opacity-20 text-xs font-gothic transition-colors"
+                      >Next →</button>
+                    </div>
+                  )}
                 </div>
+
                 {/* Spine */}
-                <div className="w-6 flex items-center justify-center" style={{ background: "linear-gradient(to right, #3d1a00, #2a1000, #3d1a00)" }}>
-                  <span className="text-amber-900/30 text-[8px] tracking-widest" style={{ writingMode: "vertical-rl" }}>✦</span>
+                <div className="w-6 flex items-center justify-center" style={{ background: "linear-gradient(to right, #1a0808, #0a0303, #1a0808)" }}>
+                  <span className="text-blood/20 text-[8px] tracking-widest" style={{ writingMode: "vertical-rl" }}>✦</span>
                 </div>
-                {/* Right page */}
-                <div className="flex-1 overflow-y-auto p-6" style={{ background: "linear-gradient(135deg, #e8d8a8 0%, #ede0b8 50%, #f5e6c8 100%)" }}>
-                  <p className="text-center text-amber-900/50 text-[10px] uppercase tracking-widest font-gothic mb-4 border-b border-amber-900/20 pb-2">
+
+                {/* Right page — selected ritual detail */}
+                <div className="flex-1 overflow-y-auto p-6" style={{ background: "linear-gradient(160deg, #0a0404 0%, #130a0a 60%, #0e0608 100%)" }}>
+                  <p className="text-center text-blood/40 text-[10px] uppercase tracking-widest font-gothic mb-4 border-b border-blood-dark/20 pb-2">
                     {discName === "Oblivion" ? "Rites of Oblivion" : "Sorcerous Works"}
                   </p>
-                  {rightPage.length === 0 ? (
-                    <p className="text-amber-900/30 text-xs italic text-center mt-8">{totalPages > 1 ? "End of page." : "No entries."}</p>
-                  ) : rightPage.map(r => <RitualEntry key={r.id} r={r} />)}
+                  {selectedRitual ? (
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <h3 className="font-gothic text-white text-lg leading-tight">{selectedRitual.name}</h3>
+                        <span className="text-blood/50 text-xs shrink-0 mt-0.5">{"●".repeat(selectedRitual.level)}{"○".repeat(5 - selectedRitual.level)}</span>
+                      </div>
+                      {selectedRitual.description && (
+                        <p className="text-gray-100 text-sm italic leading-relaxed mb-3">{selectedRitual.description}</p>
+                      )}
+                      {selectedRitual.system_text && (
+                        <div className="border-t border-blood-dark/20 pt-3 space-y-1">
+                          {selectedRitual.system_text.split("\n").map((line, i) => (
+                            line.trim() ? (
+                              <p key={i} className="text-gray-100 text-xs leading-relaxed">
+                                {line.includes(":") ? (
+                                  <>
+                                    <span className="text-blood/70 font-gothic">{line.split(":")[0]}:</span>
+                                    {line.slice(line.indexOf(":") + 1)}
+                                  </>
+                                ) : line}
+                              </p>
+                            ) : null
+                          ))}
+                        </div>
+                      )}
+                      {/* Actions */}
+                      {(() => {
+                        const learned = learnedIds.has(selectedRitual.id);
+                        const canLearn = discForBook && discForBook.level >= selectedRitual.level;
+                        const alreadyHasLvl1 = selectedRitual.level === 1 && (character.rituals || []).some(cr =>
+                          cr.ritual.discipline_id === selectedRitual.discipline_id && cr.ritual.level === 1
+                        );
+                        const xpCost = (selectedRitual.level === 1 && !alreadyHasLvl1) ? 0 : selectedRitual.level * 3;
+                        const hasXp = freeEdit || availableXp >= xpCost;
+                        return (
+                          <div className="mt-4 pt-3 border-t border-blood-dark/20">
+                            {learned ? (
+                              <div className="flex items-center gap-3">
+                                <span className="text-blood text-sm font-gothic">✓ Known</span>
+                                {(onImprove || freeEdit) && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await api.delete(`/api/characters/${character.id}/rituals/${selectedRitual.id}`);
+                                        if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                      } catch {}
+                                    }}
+                                    className="text-xs text-gray-600 hover:text-blood transition-colors"
+                                  >✕ Unlearn</button>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                disabled={!canLearn || !hasXp}
+                                onClick={async () => {
+                                  setRitualError(null);
+                                  try {
+                                    const res = await api.post(`/api/characters/${character.id}/rituals/${selectedRitual.id}`);
+                                    if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                  } catch (e) { setRitualError(e.response?.data?.detail || "Failed."); }
+                                }}
+                                className="bg-blood hover:bg-red-600 text-white font-gothic text-sm rounded px-4 py-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title={!canLearn ? `Need ${discName} level ${selectedRitual.level}` : !hasXp ? `Need ${xpCost} XP` : ""}
+                              >{xpCost === 0 ? "Learn for Free" : `Learn — ${xpCost} XP`}</button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-xs italic text-center mt-16">← Select a ritual to read its description</p>
+                  )}
                 </div>
+
                 {/* Right cover edge */}
-                <div className="w-4 rounded-r-sm" style={{ background: "linear-gradient(to left, #1a0a00, #3d1a00)" }} />
+                <div className="w-5 rounded-r" style={{ background: "linear-gradient(to left, #050202, #120508, #1a0808)" }} />
               </div>
 
-              {/* Page controls */}
-              <div className="flex items-center justify-center gap-4 mt-2">
-                <button disabled={ritualPage === 0} onClick={() => setRitualPage(p => p - 1)}
-                  className="text-amber-700/60 hover:text-amber-500 disabled:opacity-20 text-sm font-gothic tracking-widest">← Prev</button>
-                <span className="text-amber-800/50 text-xs font-gothic">{ritualPage + 1} / {Math.max(1, totalPages)}</span>
-                <button disabled={ritualPage >= totalPages - 1} onClick={() => setRitualPage(p => p + 1)}
-                  className="text-amber-700/60 hover:text-amber-500 disabled:opacity-20 text-sm font-gothic tracking-widest">Next →</button>
+              {/* Level navigation */}
+              <div className="flex items-center justify-center gap-6 mt-2">
+                <button
+                  disabled={ritualPage === 0}
+                  onClick={() => { setRitualPage(p => p - 1); setRitualInfoId(null); setRitualSubPage(0); }}
+                  className="text-gray-400 hover:text-blood disabled:opacity-20 text-sm font-gothic tracking-widest transition-colors"
+                >← Prev</button>
+                <div className="flex gap-1.5">
+                  {existingLevels.map((lvl, idx) => (
+                    <button
+                      key={lvl}
+                      onClick={() => { setRitualPage(idx); setRitualInfoId(null); setRitualSubPage(0); }}
+                      className={`w-6 h-6 rounded text-xs font-gothic border transition-colors ${idx === ritualPage ? "bg-blood border-blood text-white" : "border-gray-600 text-gray-400 hover:border-blood-dark"}`}
+                    >{lvl}</button>
+                  ))}
+                </div>
+                <button
+                  disabled={ritualPage >= existingLevels.length - 1}
+                  onClick={() => { setRitualPage(p => p + 1); setRitualInfoId(null); setRitualSubPage(0); }}
+                  className="text-gray-400 hover:text-blood disabled:opacity-20 text-sm font-gothic tracking-widest transition-colors"
+                >Next →</button>
               </div>
               {ritualError && <p className="text-center text-red-400 text-xs mt-1">{ritualError}</p>}
             </div>
