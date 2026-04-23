@@ -33,7 +33,7 @@ export default function Step2Clan({ onNext, onBack }) {
       </div>
       <p className="text-gray-400 mb-6">Your clan defines your disciplines, bane, and place in Kindred society. Click a clan to learn more.</p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {clans.map((clan) => (
           <div
             key={clan.id}

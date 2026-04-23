@@ -1247,7 +1247,7 @@ export default function CharacterSheet({
       <div className="mb-6 space-y-3">
 
         {/* Dot trackers */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-void-light border border-void-border rounded-lg p-4 text-center">
             <p className="text-gray-500 text-xs uppercase tracking-widest mb-3">Blood Potency</p>
             <DotTracker value={currentBP} max={5} onChange={setBP} variant="blood" />
@@ -1988,7 +1988,7 @@ export default function CharacterSheet({
         )}
         {onAddWeapon && showWeaponForm && (
           <div className="mt-4 bg-void border border-void-border rounded-lg p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Name *</label>
                 <SuggestionInput

@@ -87,7 +87,7 @@ export default function Step4Attributes({ onNext, onBack }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {Object.entries(ATTRIBUTES).map(([category, attrList]) => (
           <div key={category}>
             <h3 className="font-gothic text-blood text-sm mb-3 uppercase tracking-wider">{category}</h3>

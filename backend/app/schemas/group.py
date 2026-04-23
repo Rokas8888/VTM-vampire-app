@@ -95,3 +95,7 @@ class UserSearchResult(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PatchMemberRequest(BaseModel):
+    character_id: Optional[int] = None

@@ -108,7 +108,7 @@ export default function Step3Predator({ onNext, onBack, addPredatorMode = false,
         This step is optional. Some chronicles skip predator types. If unsure, ask your Storyteller.
       </p>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {types.map((pt) => (
           <div
             key={pt.id}

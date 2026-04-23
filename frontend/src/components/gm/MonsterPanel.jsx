@@ -233,7 +233,7 @@ function SkillsSection({ skills, onChange }) {
       {Object.entries(V5_SKILLS).map(([category, list]) => (
         <div key={category}>
           <p className="text-xs text-gray-600 uppercase tracking-wider mb-1">{category}</p>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
             {list.map((name) => (
               <div key={name} className="flex items-center justify-between bg-void rounded px-2 py-1.5">
                 <span className="text-xs text-gray-400 truncate mr-1">{name}</span>
@@ -494,7 +494,7 @@ function MonsterEditor({ monster, onSave, onDelete, saving }) {
       {/* Attributes */}
       <div>
         <p className="vtm-label mb-2">Attributes</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {ATTRS.map(({ key, short }) => (
             <div key={key} className="flex items-center justify-between bg-void rounded px-2 py-1.5">
               <span className="text-xs text-gray-500 w-8">{short}</span>
@@ -700,7 +700,7 @@ function CreateForm({ groupId, onCreated, onCancel }) {
       {/* Attributes */}
       <div>
         <p className="vtm-label mb-2">Attributes</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {ATTRS.map(({ key, short }) => (
             <div key={key} className="flex items-center justify-between bg-void rounded px-2 py-1.5">
               <span className="text-xs text-gray-500 w-8">{short}</span>

@@ -458,9 +458,9 @@ export default function SessionModePage() {
 
   const cols =
     cards.length === 1 ? "grid-cols-1 max-w-2xl mx-auto" :
-    cards.length === 2 ? "grid-cols-2" :
-    cards.length <= 4  ? "grid-cols-2" :
-                         "grid-cols-3";
+    cards.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
+    cards.length <= 4  ? "grid-cols-1 sm:grid-cols-2" :
+                         "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
     <div className="min-h-screen bg-void text-gray-100 p-4 flex flex-col">

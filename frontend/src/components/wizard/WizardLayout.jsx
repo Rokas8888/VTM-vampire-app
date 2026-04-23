@@ -13,7 +13,7 @@ export default function WizardLayout({ currentStep, children }) {
   return (
     <div className="min-h-screen bg-void text-gray-200">
       {/* Header */}
-      <div className="border-b border-void-border bg-void-light px-6 py-4">
+      <div className="border-b border-void-border bg-void-light px-3 sm:px-6 py-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex justify-between items-center mb-3">
             {/* Back button — hidden on step 1 */}
@@ -57,7 +57,7 @@ export default function WizardLayout({ currentStep, children }) {
       </div>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 py-8">
         {children}
       </div>
     </div>

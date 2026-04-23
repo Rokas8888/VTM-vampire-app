@@ -5,6 +5,7 @@ import useWizardStore from "../store/wizardStore";
 import api from "../services/api";
 import CharacterSheet from "../components/character/CharacterSheet";
 import DiceRollerModal from "../components/shared/DiceRollerModal";
+import HelpModal from "../components/shared/HelpModal";
 import Spinner from "../components/shared/Spinner";
 import { clanBgStyle, clanCardStyle } from "../utils/clanImages";
 
@@ -129,6 +130,9 @@ export default function DashboardPage() {
 
   // dice roller
   const [showDice,      setShowDice]      = useState(false);
+
+  // help modal
+  const [showHelp, setShowHelp] = useState(false);
   const [sessionHunger, setSessionHunger] = useState(0);
 
   // live session groups
@@ -397,16 +401,16 @@ export default function DashboardPage() {
       )}
 
       {/* ── Top navigation bar ── */}
-      <div className="border-b border-void-border bg-void-light px-6 py-3">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
+      <div className="border-b border-void-border bg-void-light px-4 sm:px-6 py-3">
+        <div className="max-w-5xl mx-auto flex justify-between items-center gap-2">
           <h1
-            className="font-gothic text-2xl text-blood cursor-pointer hover:text-blood-light transition-colors"
+            className="font-gothic text-lg sm:text-2xl text-blood cursor-pointer hover:text-blood-light transition-colors shrink-0"
             onClick={closeDetail}
             title="Back to characters"
           >
             Vampire Scriptorium
           </h1>
-          <div className="flex items-center gap-4 text-sm text-gray-500">
+          <div className="flex flex-wrap justify-end items-center gap-2 sm:gap-4 text-sm text-gray-500">
             <button onClick={() => navigate("/directory")} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
               Directory
             </button>
@@ -421,6 +425,13 @@ export default function DashboardPage() {
               </button>
             ))}
             <span className="text-gray-600">{user?.username}</span>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="px-3 py-1.5 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-400 hover:border-blood hover:text-blood transition-colors"
+              title="Help"
+            >
+              ? Help
+            </button>
             <button onClick={handleLogout} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
               Leave the Night
             </button>
@@ -767,7 +778,7 @@ export default function DashboardPage() {
                 No characters yet. Create your first vampire.
               </p>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {characters.map((char) => (
                 <CharacterCard
                   key={char.id}
@@ -828,7 +839,7 @@ export default function DashboardPage() {
           </div>
 
           {retainerEditMode && (
-            <div className="px-6 py-4 border-b border-blue-800/30 bg-blue-950/20 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="px-6 py-4 border-b border-blue-800/30 bg-blue-950/20 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {[["Name", "name"], ["Concept", "concept"], ["Ambition", "ambition"], ["Desire", "desire"]].map(([label, key]) => (
                 <div key={key}>
                   <p className="text-xs text-gray-500 mb-1">{label}</p>
@@ -899,6 +910,8 @@ export default function DashboardPage() {
         </div>
       </div>
     )}
+      {/* ── Help modal ── */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>
   );
 }

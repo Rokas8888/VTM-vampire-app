@@ -210,7 +210,7 @@ export default function Step6Disciplines({ onNext, onBack }) {
                         return (
                           <div key={lvl}>
                             <p className="text-xs text-gray-500 mb-1">Level {lvl} — pick one:</p>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {levelPowers.map((pw) => (
                                 <div
                                   key={pw.id}

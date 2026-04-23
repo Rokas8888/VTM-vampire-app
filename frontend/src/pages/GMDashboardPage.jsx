@@ -7,6 +7,7 @@ import DiceRollerModal from "../components/shared/DiceRollerModal";
 import MonsterPanel from "../components/gm/MonsterPanel";
 import ConditionManager from "../components/gm/ConditionManager";
 import Spinner from "../components/shared/Spinner";
+import HelpModal from "../components/shared/HelpModal";
 import { clanCardStyle } from "../utils/clanImages";
 
 function getRollHint(text) {
@@ -246,9 +247,9 @@ function CharacterGrid({ characters, onCardClick, onRemove }) {
   }
   const cols =
     characters.length <= 2 ? "grid-cols-1 sm:grid-cols-2" :
-    characters.length <= 4 ? "grid-cols-2" :
-    characters.length <= 6 ? "grid-cols-2 lg:grid-cols-3" :
-                              "grid-cols-2 lg:grid-cols-4";
+    characters.length <= 4 ? "grid-cols-1 sm:grid-cols-2" :
+    characters.length <= 6 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
+                              "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
   return (
     <div className={`grid ${cols} gap-4`}>
       {characters.map((char) => (
@@ -494,6 +495,9 @@ export default function GMDashboardPage() {
   // Dice roller
   const [showDice, setShowDice] = useState(false);
 
+  // Help modal
+  const [showHelp, setShowHelp] = useState(false);
+
   // Mobile sidebar toggle
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -571,6 +575,35 @@ export default function GMDashboardPage() {
     }
   };
 
+  // ── Pin character for player ──────────────────────────────────────────────
+  const [pinTarget, setPinTarget]   = useState(null); // user_id being pinned
+  const [pinChars, setPinChars]     = useState([]);
+  const [pinLoading, setPinLoading] = useState(false);
+
+  const openPinPicker = async (member) => {
+    setPinTarget(member.user_id);
+    setPinLoading(true);
+    try {
+      const res = await api.get(`/api/groups/search/players?q=${encodeURIComponent(member.username)}`);
+      const match = res.data.find((p) => p.username === member.username);
+      setPinChars(match?.characters ?? []);
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
+  const handlePinCharacter = async (userId, characterId) => {
+    if (!selectedGroup) return;
+    try {
+      const res = await api.patch(`/api/groups/${selectedGroup.id}/members/${userId}`, {
+        character_id: characterId,
+      });
+      setSelectedGroup(res.data);
+      setPinTarget(null);
+      setPinChars([]);
+    } catch { /* ignore */ }
+  };
+
   // ── Remove player ─────────────────────────────────────────────────────────
   const handleRemovePlayer = async (userId) => {
     if (!selectedGroup) return;
@@ -634,19 +667,27 @@ export default function GMDashboardPage() {
             <h1 className="font-gothic text-xl sm:text-2xl text-blood">Vampire Scriptorium</h1>
             <span className="text-xs text-gray-600 border border-void-border rounded px-2 py-0.5 font-gothic hidden sm:inline">GM</span>
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex flex-wrap justify-end items-center gap-2 sm:gap-4 text-sm">
             <button
               onClick={() => setShowDice(true)}
               className="px-3 py-1.5 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-400 hover:border-blood hover:text-blood transition-colors"
             >
-              ⚄ Dice Roller
+              ⚄ <span className="hidden sm:inline">Dice Roller</span>
             </button>
-            <button onClick={() => navigate("/directory")} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
+            <button
+              onClick={() => setShowHelp(true)}
+              className="px-3 py-1.5 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-400 hover:border-blood hover:text-blood transition-colors"
+              title="Help"
+            >
+              ? <span className="hidden sm:inline">Help</span>
+            </button>
+            <button onClick={() => navigate("/directory")} className="hidden sm:inline hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
               Directory
             </button>
-            <span className="text-gray-600">{user?.username}</span>
+            <span className="text-gray-600 hidden sm:inline">{user?.username}</span>
             <button onClick={handleLogout} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
-              Leave the Night
+              <span className="hidden sm:inline">Leave the Night</span>
+              <span className="sm:hidden">Exit</span>
             </button>
           </div>
         </div>
@@ -854,32 +895,72 @@ export default function GMDashboardPage() {
                     ) : (
                       <div className="space-y-2">
                         {selectedGroup.members.map((m) => {
-                          const pinnedChar = m.characters[0]; // if character_id set, only 1 char returned
+                          const pinnedChar = m.characters[0];
+                          const isPinning = pinTarget === m.user_id;
                           return (
-                            <div
-                              key={m.user_id}
-                              className="flex justify-between items-center bg-void-light border border-void-border rounded px-4 py-3"
-                            >
-                              <div>
-                                <span className="text-gray-200 text-sm font-medium">{m.username}</span>
-                                {pinnedChar ? (
-                                  <span className="text-gray-500 text-xs ml-2">
-                                    · {pinnedChar.name ?? "Unnamed"}
-                                    {pinnedChar.clan_name && ` (${pinnedChar.clan_name})`}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-600 text-xs ml-2">
-                                    {m.characters.length} {m.characters.length === 1 ? "character" : "characters"}
-                                  </span>
-                                )}
+                            <div key={m.user_id} className="bg-void-light border border-void-border rounded px-4 py-3 space-y-2">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="text-gray-200 text-sm font-medium">{m.username}</span>
+                                  {pinnedChar ? (
+                                    <span className="text-gray-500 text-xs ml-2">
+                                      · {pinnedChar.name ?? "Unnamed"}
+                                      {pinnedChar.clan_name && ` (${pinnedChar.clan_name})`}
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-700 text-xs ml-2 italic">No character pinned</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => isPinning ? setPinTarget(null) : openPinPicker(m)}
+                                    className="text-xs text-gray-500 hover:text-blood transition-colors"
+                                    title="Pin character"
+                                  >
+                                    {isPinning ? "Cancel" : pinnedChar ? "Change" : "📌 Pin"}
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemovePlayer(m.user_id)}
+                                    className="text-gray-700 hover:text-blood text-xs transition-colors"
+                                    title="Remove from group"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
                               </div>
-                              <button
-                                onClick={() => handleRemovePlayer(m.user_id)}
-                                className="text-gray-700 hover:text-blood text-xs transition-colors"
-                                title="Remove from group"
-                              >
-                                Remove
-                              </button>
+
+                              {/* Inline pin picker */}
+                              {isPinning && (
+                                <div className="border-t border-void-border/40 pt-2 space-y-1">
+                                  {pinLoading ? (
+                                    <p className="text-gray-600 text-xs animate-pulse">Loading characters…</p>
+                                  ) : pinChars.length === 0 ? (
+                                    <p className="text-gray-600 text-xs italic">No completed characters found.</p>
+                                  ) : (
+                                    <>
+                                      <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Select character:</p>
+                                      {pinChars.map((c) => (
+                                        <button
+                                          key={c.id}
+                                          onClick={() => handlePinCharacter(m.user_id, c.id)}
+                                          className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded border border-void-border hover:border-blood hover:text-gray-200 text-gray-400 text-sm transition-colors"
+                                        >
+                                          <span>{c.name ?? "Unnamed"}</span>
+                                          {c.clan_name && <span className="text-xs text-gray-600">· {c.clan_name}</span>}
+                                        </button>
+                                      ))}
+                                      {m.character_id && (
+                                        <button
+                                          onClick={() => handlePinCharacter(m.user_id, null)}
+                                          className="text-xs text-gray-600 hover:text-blood transition-colors mt-1"
+                                        >
+                                          Unpin character
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -927,6 +1008,9 @@ export default function GMDashboardPage() {
 
       {/* ── Dice roller modal ── */}
       {showDice && <DiceRollerModal onClose={() => setShowDice(false)} hunger={0} manualHunger />}
+
+      {/* ── Help modal ── */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
       {/* ── Delete group confirmation ── */}
       {deleteTarget && (

@@ -13,6 +13,12 @@ const NAMES = [
   "Celeste Mourning", "Alistair Grave", "Nadia Sable", "Caspian Darke", "Aurelia Voss",
   "Theron Blackwell", "Lyra Vesper", "Cassian Dread", "Zara Nighthollow", "Edmund Pale",
   "Rosalind Ash", "Oberon Sorrow", "Vanya Crux", "Leander Fell", "Mirella Storm",
+  "Corvus Dain", "Thessaly Vane", "Aldric Mourne", "Sybil Ashgate", "Florian Grave",
+  "Ismene Darkwater", "Balthazar Crowe", "Vesper Holloway", "Emeric Lorne", "Calliope Shade",
+  "Roderick Vale", "Marisol Vex", "Ignatius Fell", "Lavinia Sable", "Hadrian Storm",
+  "Solène Nox", "Caius Blackwell", "Orinthia Cross", "Evander Mist", "Thessaly Dread",
+  "Valerian Noire", "Isadora Crane", "Remiel Voss", "Circe Ashcroft", "Mordecai Grey",
+  "Lucasta Moon", "Cyprian Fell", "Evangeline Vane", "Phaedrus Sorrow", "Zinnia Darke",
 ];
 
 const CONCEPTS = [
@@ -36,6 +42,26 @@ const CONCEPTS = [
   "War correspondent who witnessed something inhuman",
   "Disgraced aristocrat clinging to faded prestige",
   "Social worker Embraced while trying to help a client",
+  "Disbarred lawyer who defended the wrong client",
+  "Former cultist who escaped one predator only to become another",
+  "Archivist who discovered a truth buried in old records",
+  "Professional thief Embraced mid-heist",
+  "Addiction counsellor who understood hunger all too well",
+  "Veteran intelligence officer with too many identities",
+  "Playwright who wrote their own tragedy without knowing it",
+  "Corporate fixer whose last job went very wrong",
+  "Philanthropist who bought the wrong favour",
+  "Tattoo artist whose clients started disappearing",
+  "Former gang leader trying to protect their old neighbourhood",
+  "Academic who published one paper too many about the occult",
+  "Street medic Embraced in a city no one cares about",
+  "Disgraced chef whose last dinner service ended in blood",
+  "Professional diver who found something beneath the surface",
+  "Night-shift security guard who saw too much",
+  "Retired assassin who thought they were out",
+  "Translator who understood something they were not meant to",
+  "Urban explorer who went into the wrong building",
+  "Insurance investigator who uncovered one real conspiracy",
 ];
 
 const AMBITIONS = [
@@ -57,6 +83,23 @@ const AMBITIONS = [
   "Survive long enough to understand why I was Embraced",
   "Track down and destroy a specific ancient enemy",
   "Become the most feared name in this city's underworld",
+  "Find proof that my sire is still alive and hiding",
+  "Take control of a mortal institution — police, media, or finance",
+  "Break a blood bond that was placed on me without my knowledge",
+  "Carve out neutral territory that no faction can claim",
+  "Discover what really happened the night I was Embraced",
+  "Build something that outlasts me — a legacy I can be proud of",
+  "Find the ancient who sleeps beneath this city and wake them",
+  "Make the Prince fear my name before the decade is out",
+  "Protect the last mortal I still care about — at any cost",
+  "Become indispensable to a faction I do not trust",
+  "Reclaim the life that was stolen from me",
+  "Destroy the covenant that controls this city from the shadows",
+  "Find others like me and build something real",
+  "Diablerise an elder and take their power for myself",
+  "Discover whether Golconda is a myth or something real",
+  "Outlive every Kindred who underestimated me",
+  "Forge a peace between two factions before war destroys the city",
 ];
 
 const DESIRES = [
@@ -75,6 +118,21 @@ const DESIRES = [
   "Have one night where I feel almost human",
   "Learn whether my sire is still alive",
   "Get out of a debt I owe to a dangerous elder",
+  "Find a safe place to sleep before sunrise",
+  "Stop thinking about what I did last feeding",
+  "Avoid the elder who has been asking questions about me",
+  "Deliver a message without anyone knowing I was involved",
+  "Learn one true thing about this city's power structure",
+  "Find out why someone has been following me for three nights",
+  "Get one full night of not being afraid",
+  "Warn a mortal before someone else gets to them first",
+  "Call in a favour I have been saving for months",
+  "Find out who spread a lie about me at the last gathering",
+  "Keep my temper in check during a meeting I cannot afford to ruin",
+  "Locate a piece of information before dawn",
+  "Make a connection that does not feel transactional",
+  "Track down the Kindred who owes me a serious answer",
+  "Get through the night without feeding on someone I care about",
 ];
 
 export function randomConcept() {
@@ -273,6 +331,16 @@ const CONVICTION_PAIRS = [
   { conviction: "I will never let go of what I love most",  touchstone: "My mother — she still lights a candle for me every Sunday" },
   { conviction: "I will not break a vow made to the dead",  touchstone: "Kira — my best friend before she was killed" },
   { conviction: "I will remember that mortals have names",  touchstone: "Jonah — a barista who treats everyone with the same kindness" },
+  { conviction: "I will not use my gifts to humiliate",     touchstone: "Old Mr. Vasik — a neighbour who always treated me with dignity" },
+  { conviction: "I will not destroy what cannot be rebuilt",touchstone: "Lena — an artist whose work reminds me beauty still exists" },
+  { conviction: "I will give mortals a fair chance to run", touchstone: "Rico — a street kid I protected once without feeding on him" },
+  { conviction: "I will not lie to those who depend on me", touchstone: "Dr. Osei — my old supervisor, honest to a fault" },
+  { conviction: "I will never torture for information",     touchstone: "Auntie Vera — the kindest person I have ever known" },
+  { conviction: "I will not feed on grief",                 touchstone: "Marco — a widower I check on every few weeks" },
+  { conviction: "I will not turn someone without consent",  touchstone: "Priya — my closest friend from before who is still mortal" },
+  { conviction: "I will protect those weaker than me",      touchstone: "Young Dasha — a runaway I once helped find shelter" },
+  { conviction: "I will not destroy evidence of my own crimes unless lives depend on it", touchstone: "Judge Farrow — the one honest judge I ever met" },
+  { conviction: "I will not erase a mortal's memory unless there is no other way", touchstone: "Elias — a journalist who once wrote the truth anyway" },
 ];
 
 export function randomBeliefs() {
@@ -328,6 +396,15 @@ const BIOGRAPHIES = [
   "I spent my first month convinced it was a nightmare. By the second month, I had stopped hoping to wake up.",
   "The world looks different through these eyes. Sharper. Hungrier. I am learning to make peace with what I have become.",
   "Some nights I go back to the street where I died. I do not know what I am looking for. Maybe I am just saying goodbye.",
+  "I was good at my life. That is the part that still hurts. I was actually good at it.",
+  "My sire never explained anything. They Embraced me, watched me survive the first week, and disappeared. I am still angry about that.",
+  "I keep a list of everyone I have harmed since the Embrace. It is not a list I am proud of. But I keep it anyway.",
+  "The person I was before would not recognise me. I am not sure if that is a loss or a relief.",
+  "There was a moment when I could have chosen differently. I think about that moment every night.",
+  "I told myself I would hold on to the things that made me human. Some of them are already gone. I am protecting what is left.",
+  "The hunger is manageable most nights. Most nights.",
+  "I made one real mistake before the Embrace that I never corrected. Now I carry it into eternity.",
+  "I used to believe the world was mostly good. I am not sure what I believe now. But I am not ready to stop trying.",
 ];
 
 export function randomGeneration() {

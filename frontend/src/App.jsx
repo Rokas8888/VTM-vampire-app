@@ -9,6 +9,9 @@ import GMDashboardPage from "./pages/GMDashboardPage";
 import AdminPage from "./pages/AdminPage";
 import PlayerDirectoryPage from "./pages/PlayerDirectoryPage";
 import SessionModePage from "./pages/SessionModePage";
+import SceneMapPrototype from "./components/gm/SceneMapPrototype";
+import { lazy, Suspense } from "react";
+const SceneMap3D = lazy(() => import("./components/gm/SceneMap3D"));
 
 // Shows a loading screen while we check if the user is logged in
 function Loading() {
@@ -70,6 +73,18 @@ export default function App() {
         <Route path="/session/:groupId" element={
           <PrivateRoute allowedRoles={["player", "gm", "admin"]}>
             <SessionModePage />
+          </PrivateRoute>
+        } />
+        <Route path="/scene-test" element={
+          <PrivateRoute allowedRoles={["gm", "admin"]}>
+            <SceneMapPrototype />
+          </PrivateRoute>
+        } />
+        <Route path="/scene-3d" element={
+          <PrivateRoute allowedRoles={["gm", "admin"]}>
+            <Suspense fallback={<div className="min-h-screen bg-void flex items-center justify-center"><p className="font-gothic text-blood animate-pulse">Loading 3D...</p></div>}>
+              <SceneMap3D />
+            </Suspense>
           </PrivateRoute>
         } />
         <Route path="/" element={<Navigate to="/login" replace />} />

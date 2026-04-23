@@ -7,7 +7,7 @@ from app.models.group import Group, GroupMember
 from app.models.character import Character, CharacterSkill, CharacterAttribute, CharacterDiscipline, CharacterPower, CharacterStatus
 from app.models.game_data import DisciplinePower
 from app.schemas.group import (
-    GroupCreate, GroupUpdate, AddMemberRequest,
+    GroupCreate, GroupUpdate, AddMemberRequest, PatchMemberRequest,
     GroupOut, GroupSummaryOut, GroupMemberOut, GMCharacterCard,
     UserSearchResult, CharacterSearchSummary,
 )
@@ -149,16 +149,8 @@ def group_to_out(group: Group, db: Session) -> GroupOut:
                 .all()
             )
         else:
-            # Show all completed characters for this player
-            chars = (
-                db.query(Character)
-                .options(joinedload(Character.clan))
-                .filter(
-                    Character.user_id == m.user_id,
-                    Character.status == CharacterStatus.complete,
-                )
-                .all()
-            )
+            # No character pinned — show nothing until GM pins one
+            chars = []
         members_out.append(GroupMemberOut(
             user_id=m.user_id,
             username=m.user.username,
@@ -385,6 +377,40 @@ def add_member(
             raise HTTPException(status_code=400, detail="Character not found or not owned by this player.")
 
     db.add(GroupMember(group_id=group_id, user_id=player.id, character_id=body.character_id))
+    db.commit()
+    return group_to_out(
+        db.query(Group)
+        .options(joinedload(Group.members).joinedload(GroupMember.user))
+        .filter(Group.id == group_id)
+        .first(),
+        db,
+    )
+
+
+@router.patch("/{group_id}/members/{user_id}", response_model=GroupOut)
+def pin_member_character(
+    group_id: int, user_id: int, body: PatchMemberRequest,
+    gm: User = Depends(require_gm), db: Session = Depends(get_db),
+):
+    """Pin or unpin a specific character for a group member."""
+    load_group(group_id, gm, db)
+    member = db.query(GroupMember).filter(
+        GroupMember.group_id == group_id,
+        GroupMember.user_id == user_id,
+    ).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found in group.")
+
+    if body.character_id is not None:
+        char = db.query(Character).filter(
+            Character.id == body.character_id,
+            Character.user_id == user_id,
+            Character.status == CharacterStatus.complete,
+        ).first()
+        if not char:
+            raise HTTPException(status_code=400, detail="Character not found or not owned by this player.")
+
+    member.character_id = body.character_id
     db.commit()
     return group_to_out(
         db.query(Group)

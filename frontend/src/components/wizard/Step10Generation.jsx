@@ -55,7 +55,7 @@ export default function Step10Generation({ onBack }) {
       <p className="text-gray-400 mb-6">How long have you walked the night? Your generation determines your Blood Potency.</p>
 
       {/* Generation selection */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {GENERATIONS.map((g) => (
           <div
             key={g.value}

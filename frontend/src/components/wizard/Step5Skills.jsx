@@ -229,7 +229,7 @@ export default function Step5Skills({ onNext, onBack }) {
       <p className="text-gray-400 mb-6">Choose a distribution style, then fill in your skill dots.</p>
 
       {/* Distribution picker */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         {Object.entries(DISTRIBUTIONS).map(([key, d]) => (
           <div
             key={key}
@@ -274,7 +274,7 @@ export default function Step5Skills({ onNext, onBack }) {
 
       {/* Skill grid — only visible after picking a distribution */}
       {dist && (
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
           {Object.entries(SKILLS).map(([category, skillList]) => (
             <div key={category}>
               <h3 className="font-gothic text-blood text-sm mb-3 uppercase tracking-wider">{category}</h3>
@@ -350,7 +350,7 @@ export default function Step5Skills({ onNext, onBack }) {
           {/* Free extra specialty */}
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Free specialty (any skill with dots)</p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <select
                 value={freeSkill}
                 onChange={(e) => updateFreeSpecialty(e.target.value, freeName)}

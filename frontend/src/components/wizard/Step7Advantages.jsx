@@ -154,7 +154,7 @@ export default function Step7Advantages({ onNext, onBack }) {
         {isValid && !customTextComplete() && <span className="text-yellow-500">⚠ Fill in required details</span>}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Merits */}
         <div>
           <h3 className="font-gothic text-blood text-sm mb-2 uppercase tracking-wider">Merits</h3>

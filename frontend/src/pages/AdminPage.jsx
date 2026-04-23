@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import useAuthStore from "../store/authStore";
 import api from "../services/api";
+import HelpModal from "../components/shared/HelpModal";
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, accent }) {
@@ -49,6 +50,7 @@ export default function AdminPage() {
   const [confirm, setConfirm] = useState(null); // { type: "delete"|"role"|"active", userId, value, label }
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
 
   // ── Fetch helpers ───────────────────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
@@ -134,6 +136,12 @@ export default function AdminPage() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-gray-500 text-sm">{user?.username}</span>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="text-xs text-gray-500 hover:text-blood border border-void-border px-3 py-1.5 rounded transition-colors font-gothic tracking-wider"
+          >
+            ? Help
+          </button>
           <button
             onClick={logout}
             className="text-xs text-gray-500 hover:text-blood border border-void-border px-3 py-1.5 rounded transition-colors font-gothic tracking-wider"
@@ -313,6 +321,8 @@ export default function AdminPage() {
       </main>
 
       {/* ── Confirmation modal ─────────────────────────────────────────────────── */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="bg-void-light border border-blood-dark rounded-lg p-6 w-full max-w-sm shadow-2xl">
