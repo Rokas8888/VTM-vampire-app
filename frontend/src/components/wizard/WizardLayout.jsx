@@ -27,7 +27,7 @@ export default function WizardLayout({ currentStep, children }) {
             ) : (
               <span />
             )}
-            <h1 className="font-gothic text-2xl text-blood">Character Creation</h1>
+            <h1 className="font-gothic text-xl sm:text-2xl text-blood">Character Creation</h1>
             <span className="text-gray-500 text-sm font-gothic">
               {currentStep} / 10 — {STEPS[currentStep - 1]}
             </span>

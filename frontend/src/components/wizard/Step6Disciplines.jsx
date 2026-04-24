@@ -144,7 +144,7 @@ export default function Step6Disciplines({ onNext, onBack }) {
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">
             Step 1 — Pick 2 disciplines
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {allDisciplines.map((disc) => {
               const chosen = !!selections.find((s) => s.discipline_id === disc.id);
               const disabled = !chosen && selections.length >= 2;

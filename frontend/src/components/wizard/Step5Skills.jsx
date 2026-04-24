@@ -284,8 +284,8 @@ export default function Step5Skills({ onNext, onBack }) {
                   return (
                     <div key={skill}>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-gray-300 text-sm">{displayName(skill)}</span>
-                        <span className={`font-gothic text-sm ${val > 0 ? "text-blood" : "text-gray-700"}`}>
+                        <span className="text-gray-300 text-sm truncate flex-1 min-w-0">{displayName(skill)}</span>
+                        <span className={`font-gothic text-sm shrink-0 ml-1 ${val > 0 ? "text-blood" : "text-gray-700"}`}>
                           {val}
                         </span>
                       </div>

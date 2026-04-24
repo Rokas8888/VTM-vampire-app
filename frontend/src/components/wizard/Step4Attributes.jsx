@@ -95,8 +95,8 @@ export default function Step4Attributes({ onNext, onBack }) {
               {attrList.map((attr) => (
                 <div key={attr}>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-300 text-sm">{attr}</span>
-                    <span className="text-blood font-gothic text-sm">{attrs[attr]}</span>
+                    <span className="text-gray-300 text-sm truncate flex-1 min-w-0">{attr}</span>
+                    <span className="text-blood font-gothic text-sm shrink-0 ml-1">{attrs[attr]}</span>
                   </div>
                   <p className="text-gray-600 text-xs mb-2">{ATTR_DESCRIPTIONS[attr]}</p>
                   {/* Dot buttons 1–5 */}
