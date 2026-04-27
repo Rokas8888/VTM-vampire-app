@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, Suspense, useMemo, useCallback } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
-import { EffectComposer, SSAO, Bloom } from "@react-three/postprocessing";
-import { BlendFunction } from "postprocessing";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 
 // ── grid config ───────────────────────────────────────────────────────────────
 const GRID  = 28;
@@ -225,19 +224,35 @@ ALL_URLS.forEach(useGLTF.preload);
 
 const WALL_URLS  = new Set([...Object.values(ASSET_CATEGORIES.Walls), ...Object.values(ASSET_CATEGORIES.Doors)]);
 const FLOOR_URLS = new Set(Object.values(ASSET_CATEGORIES.Floors));
+const STAIR_URLS = new Set(Object.values(ASSET_CATEGORIES.Stairs));
 
 const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
 const isEmpty = (c) => !c || (!c.floor && !c.walls?.h && !c.walls?.v && !c.object);
 
+function wallLineCells(startCol, startRow, endIdx, dir) {
+  const endCol = endIdx % GRID;
+  const endRow = Math.floor(endIdx / GRID);
+  const cells  = new Set();
+  if (dir === "h") {
+    const minC = Math.min(startCol, endCol), maxC = Math.max(startCol, endCol);
+    for (let c = minC; c <= maxC; c++) cells.add(startRow * GRID + c);
+  } else {
+    const minR = Math.min(startRow, endRow), maxR = Math.max(startRow, endRow);
+    for (let r = minR; r <= maxR; r++) cells.add(r * GRID + startCol);
+  }
+  return cells;
+}
+
 // ── 3D tile ───────────────────────────────────────────────────────────────────
 function Tile({ url, x, z, rotY = 0, scale = SCALE }) {
   const { scene } = useGLTF(url);
-  const isLit = url.includes("torch_lit") || url.includes("candle_lit") || url.includes("candle_thin_lit") || url.includes("candle_triple");
-  const cloned = useMemo(() => {
+  const isLit   = url.includes("torch_lit") || url.includes("candle_lit") || url.includes("candle_thin_lit") || url.includes("candle_triple");
+  const isStair = STAIR_URLS.has(url);
+  const cloned  = useMemo(() => {
     const c = scene.clone(true);
     c.traverse(ch => {
       if (ch.isMesh) {
-        ch.castShadow = true;
+        ch.castShadow    = true;
         ch.receiveShadow = true;
         if (isLit && ch.material?.emissive) {
           ch.material = ch.material.clone();
@@ -247,6 +262,13 @@ function Tile({ url, x, z, rotY = 0, scale = SCALE }) {
     });
     return c;
   }, [scene, isLit]);
+  if (isStair) {
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
+        <primitive object={cloned} position={[0, 0, -TILE * 0.5]} scale={[scale, scale, scale]} />
+      </group>
+    );
+  }
   return <primitive object={cloned} position={[x, 0, z]} rotation={[0, rotY, 0]} scale={[scale, scale, scale]} />;
 }
 
@@ -399,10 +421,11 @@ export default function SceneMap3D() {
   const shiftDragEnd   = useRef(null);
 
   // normal drag state
-  const dragging  = useRef(false);
-  const dragDir   = useRef("h");
-  const dragStart = useRef(null);
-  const dirLocked = useRef(false);
+  const dragging        = useRef(false);
+  const dragStart       = useRef(null);
+  const wallLineDir     = useRef(null);   // "h" | "v" | null — locked on first off-origin cell
+  const wallLineCurrent = useRef(null);   // last cell idx entered during wall drag
+  const isWallDrag      = useRef(false);  // whether current drag is a wall line
 
   // ── grid mutator that keeps gridRef in sync ────────────────────────────────
   const applyGrid = useCallback((updater) => {
@@ -469,23 +492,16 @@ export default function SceneMap3D() {
   const hourLabel = `${String(Math.floor(hour)).padStart(2, "0")}:00`;
 
   // ── paint / erase ──────────────────────────────────────────────────────────
-  const paintCell = (idx, dir) => {
-    if (!activeUrl || tool === "erase") return;
+  const paintCell = (idx) => {
+    if (!activeUrl || tool === "erase" || isWall) return;
     applyGrid(prev => {
       const next = [...prev];
       const cur  = next[idx] ? { ...next[idx], walls: { ...next[idx].walls } } : mkCell();
       if (isFloor) {
         cur.floor = { url: activeUrl, rotY: brushRotation };
-        next[idx] = cur;
-        return next;
+      } else {
+        cur.object = { url: activeUrl, rotY: brushRotation };
       }
-      if (isWall) {
-        if (dir === "h") cur.walls.h = { url: activeUrl, rotY: 0 };
-        else              cur.walls.v = { url: activeUrl, rotY: 0 };
-        next[idx] = isEmpty(cur) ? null : cur;
-        return next;
-      }
-      cur.object = { url: activeUrl, rotY: brushRotation };
       next[idx] = cur;
       return next;
     });
@@ -529,6 +545,24 @@ export default function SceneMap3D() {
     shiftDragEnd.current   = null;
   }, [tool, activeUrl, isFloor, isWall, brushRotation, applyGrid, pushHistory]);
 
+  const applyWallLine = useCallback((startIdx, endIdx, dir) => {
+    if (!activeUrl) return;
+    const startCol = startIdx % GRID, startRow = Math.floor(startIdx / GRID);
+    const resolvedDir = dir ?? "h";
+    const cells = wallLineCells(startCol, startRow, endIdx, resolvedDir);
+    applyGrid(prev => {
+      const next = [...prev];
+      cells.forEach(i => {
+        const cur = next[i] ? { ...next[i], walls: { ...next[i].walls } } : mkCell();
+        if (resolvedDir === "h") cur.walls.h = { url: activeUrl, rotY: 0 };
+        else                      cur.walls.v = { url: activeUrl, rotY: 0 };
+        next[i] = cur;
+      });
+      return next;
+    });
+    setHighlightCells(new Set());
+  }, [activeUrl, applyGrid]);
+
   // ── drag handlers ──────────────────────────────────────────────────────────
   const handleDown = (e, idx) => {
     if (e.shiftKey) {
@@ -540,9 +574,16 @@ export default function SceneMap3D() {
     pushHistory();
     if (tool === "erase") { eraseCell(idx); return; }
     dragging.current  = true;
-    dirLocked.current = false;
     dragStart.current = { col: idx % GRID, row: Math.floor(idx / GRID), idx };
-    paintCell(idx, dragDir.current);
+    if (isWall) {
+      isWallDrag.current      = true;
+      wallLineDir.current     = null;
+      wallLineCurrent.current = idx;
+      setHighlightCells(new Set([idx]));
+    } else {
+      isWallDrag.current = false;
+      paintCell(idx);
+    }
   };
 
   const handleEnter = (idx) => {
@@ -561,14 +602,21 @@ export default function SceneMap3D() {
     }
     if (tool === "erase") { eraseCell(idx); return; }
     if (!dragging.current || !dragStart.current) return;
-    const col = idx % GRID, row = Math.floor(idx / GRID);
-    const dc = Math.abs(col - dragStart.current.col), dr = Math.abs(row - dragStart.current.row);
-    if (dc !== dr) {
-      const newDir = dc > dr ? "h" : "v";
-      if (!dirLocked.current) { dirLocked.current = true; dragDir.current = newDir; paintCell(dragStart.current.idx, newDir); }
-      else dragDir.current = newDir;
+
+    if (isWallDrag.current) {
+      const col = idx % GRID, row = Math.floor(idx / GRID);
+      const dc = col - dragStart.current.col, dr = row - dragStart.current.row;
+      if (!wallLineDir.current && (dc !== 0 || dr !== 0)) {
+        wallLineDir.current = Math.abs(dc) >= Math.abs(dr) ? "h" : "v";
+      }
+      wallLineCurrent.current = idx;
+      if (wallLineDir.current) {
+        setHighlightCells(wallLineCells(dragStart.current.col, dragStart.current.row, idx, wallLineDir.current));
+      }
+      return;
     }
-    paintCell(idx, dragDir.current);
+
+    paintCell(idx);
   };
 
   // ── keyboard + pointerup ───────────────────────────────────────────────────
@@ -576,14 +624,21 @@ export default function SceneMap3D() {
     const up = () => {
       if (shiftDragStart.current !== null && shiftDragEnd.current !== null) {
         applyRectangle(shiftDragStart.current, shiftDragEnd.current);
-      } else {
-        setHighlightCells(new Set());
-        shiftDragStart.current = null;
-        shiftDragEnd.current   = null;
+        return;
       }
-      dragging.current  = false;
-      dragStart.current = null;
-      dirLocked.current = false;
+      if (isWallDrag.current && dragStart.current) {
+        applyWallLine(
+          dragStart.current.idx,
+          wallLineCurrent.current ?? dragStart.current.idx,
+          wallLineDir.current
+        );
+      }
+      dragging.current        = false;
+      dragStart.current       = null;
+      isWallDrag.current      = false;
+      wallLineDir.current     = null;
+      wallLineCurrent.current = null;
+      setHighlightCells(new Set());
     };
 
     const onKey = (e) => {
@@ -605,7 +660,7 @@ export default function SceneMap3D() {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("keydown", onKey);
     };
-  }, [undo, redo, applyRectangle]);
+  }, [undo, redo, applyRectangle, applyWallLine]);
 
   // ── fill floor ─────────────────────────────────────────────────────────────
   const fillFloor = () => {
@@ -745,8 +800,7 @@ export default function SceneMap3D() {
             />
           </Suspense>
           <EffectComposer>
-            <SSAO blendFunction={BlendFunction.MULTIPLY} samples={16} radius={0.04} intensity={20} luminanceInfluence={0.5} color="black" />
-            <Bloom luminanceThreshold={1} luminanceSmoothing={0.9} mipmapBlur intensity={0.6} />
+            <Bloom luminanceThreshold={1} luminanceSmoothing={0.9} intensity={0.6} />
           </EffectComposer>
         </Canvas>
 
