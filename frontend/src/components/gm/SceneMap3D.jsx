@@ -231,10 +231,7 @@ const STAIR_URLS = new Set(Object.values(ASSET_CATEGORIES.Stairs));
 // Selecting any asset in these categories auto-switches to Draw Walls mode
 const WALL_CATS = new Set(["Walls", "Doors"]);
 
-// Left panel only shows wall/door models — the edge draw tool picker
-const PANEL_CATEGORIES = Object.fromEntries(
-  Object.entries(ASSET_CATEGORIES).filter(([cat]) => WALL_CATS.has(cat))
-);
+const PANEL_CATEGORIES = ASSET_CATEGORIES;
 
 const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
 const isEmpty = (c) => !c || (!c.floor && !c.object);
@@ -488,9 +485,9 @@ export default function SceneMap3D() {
   const [vEdges,         setVEdges]         = useState(() => new Array(812).fill(null));
   const [hoveredEdge,    setHoveredEdge]    = useState(null);
   const [previewEdges,   setPreviewEdges]   = useState([]);
-  const [tool,           setTool]           = useState("wall");
-  const [activeCategory, setActiveCategory] = useState("Walls");
-  const [activeName,     setActiveName]     = useState("Stone");
+  const [tool,           setTool]           = useState("place");
+  const [activeCategory, setActiveCategory] = useState("Floors");
+  const [activeName,     setActiveName]     = useState("Stone Tile");
   const [hdri,           setHdri]           = useState("night");
   const [fogDensity,     setFogDensity]     = useState(0.18);
   const [hour,           setHour]           = useState(23);
