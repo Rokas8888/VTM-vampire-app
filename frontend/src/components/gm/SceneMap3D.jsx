@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, Suspense, useMemo, useCallback } from "rea
 import { useParams } from "react-router-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import api from "../../services/api";
 import { useToast } from "../../store/toastStore";
 
@@ -229,21 +228,42 @@ const WALL_URLS  = new Set([...Object.values(ASSET_CATEGORIES.Walls), ...Object.
 const FLOOR_URLS = new Set(Object.values(ASSET_CATEGORIES.Floors));
 const STAIR_URLS = new Set(Object.values(ASSET_CATEGORIES.Stairs));
 
-const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
-const isEmpty = (c) => !c || (!c.floor && !c.walls?.h && !c.walls?.v && !c.object);
+// Left panel shows all categories except Walls (walls use dedicated edge tool)
+const PANEL_CATEGORIES = Object.fromEntries(
+  Object.entries(ASSET_CATEGORIES).filter(([cat]) => cat !== "Walls")
+);
 
-function wallLineCells(startCol, startRow, endIdx, dir) {
-  const endCol = endIdx % GRID;
-  const endRow = Math.floor(endIdx / GRID);
-  const cells  = new Set();
-  if (dir === "h") {
-    const minC = Math.min(startCol, endCol), maxC = Math.max(startCol, endCol);
-    for (let c = minC; c <= maxC; c++) cells.add(startRow * GRID + c);
+const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
+const isEmpty = (c) => !c || (!c.floor && !c.object);
+
+function snapToEdge(point, cellIdx) {
+  const cellCol = cellIdx % GRID;
+  const cellRow = Math.floor(cellIdx / GRID);
+  const fracX   = (point.x + HALF) / TILE - cellCol;
+  const fracZ   = (point.z + HALF) / TILE - cellRow;
+  const dLeft = fracX, dRight = 1 - fracX, dTop = fracZ, dBottom = 1 - fracZ;
+  const minDist = Math.min(dLeft, dRight, dTop, dBottom);
+  if (minDist > 0.4) return null;
+  if (minDist === dLeft)   return { type: "v", idx: cellRow * (GRID + 1) + cellCol };
+  if (minDist === dRight)  return { type: "v", idx: cellRow * (GRID + 1) + cellCol + 1 };
+  if (minDist === dTop)    return { type: "h", idx: cellRow * GRID + cellCol };
+  return                          { type: "h", idx: (cellRow + 1) * GRID + cellCol };
+}
+
+function wallLineEdges(anchorIdx, currentIdx, axis) {
+  if (axis === "h") {
+    const row = Math.floor(anchorIdx / GRID);
+    const c0  = anchorIdx % GRID, c1 = currentIdx % GRID;
+    const result = [];
+    for (let c = Math.min(c0, c1); c <= Math.max(c0, c1); c++) result.push(row * GRID + c);
+    return result;
   } else {
-    const minR = Math.min(startRow, endRow), maxR = Math.max(startRow, endRow);
-    for (let r = minR; r <= maxR; r++) cells.add(r * GRID + startCol);
+    const col = anchorIdx % (GRID + 1);
+    const r0  = Math.floor(anchorIdx / (GRID + 1)), r1 = Math.floor(currentIdx / (GRID + 1));
+    const result = [];
+    for (let r = Math.min(r0, r1); r <= Math.max(r0, r1); r++) result.push(r * (GRID + 1) + col);
+    return result;
   }
-  return cells;
 }
 
 // ── 3D tile ───────────────────────────────────────────────────────────────────
@@ -259,7 +279,7 @@ function Tile({ url, x, z, rotY = 0, scale = SCALE }) {
         ch.receiveShadow = true;
         if (isLit && ch.material?.emissive) {
           ch.material = ch.material.clone();
-          ch.material.emissiveIntensity = 1.8;
+          ch.material.emissiveIntensity = 1.0;
         }
       }
     });
@@ -300,11 +320,70 @@ function CellMeshes({ cell, x, z }) {
   if (!cell) return null;
   return (
     <group>
-      {cell.floor    && <Suspense fallback={null}><Tile url={cell.floor.url}    x={x} z={z} rotY={cell.floor.rotY ?? 0} /></Suspense>}
-      {cell.walls?.h && <Suspense fallback={null}><Tile url={cell.walls.h.url}  x={x} z={z - TILE * 0.5} rotY={0} /></Suspense>}
-      {cell.walls?.v && <Suspense fallback={null}><Tile url={cell.walls.v.url}  x={x - TILE * 0.5} z={z} rotY={Math.PI / 2} /></Suspense>}
-      {cell.object   && <Suspense fallback={null}><Tile url={cell.object.url}   x={x} z={z} rotY={cell.object.rotY ?? 0} /></Suspense>}
+      {cell.floor  && <Suspense fallback={null}><Tile url={cell.floor.url}  x={x} z={z} rotY={cell.floor.rotY ?? 0} /></Suspense>}
+      {cell.object && <Suspense fallback={null}><Tile url={cell.object.url} x={x} z={z} rotY={cell.object.rotY ?? 0} /></Suspense>}
     </group>
+  );
+}
+
+// ── edge walls ────────────────────────────────────────────────────────────────
+function EdgeWalls({ hEdges, vEdges }) {
+  const wallUrl = ASSET_CATEGORIES.Walls["Stone"];
+  return (
+    <>
+      {hEdges.map((on, i) => {
+        if (!on) return null;
+        const r = Math.floor(i / GRID), c = i % GRID;
+        return (
+          <Suspense key={`h${i}`} fallback={null}>
+            <Tile url={wallUrl} x={(c + 0.5) * TILE - HALF} z={r * TILE - HALF} rotY={0} />
+          </Suspense>
+        );
+      })}
+      {vEdges.map((on, i) => {
+        if (!on) return null;
+        const r = Math.floor(i / (GRID + 1)), c = i % (GRID + 1);
+        return (
+          <Suspense key={`v${i}`} fallback={null}>
+            <Tile url={wallUrl} x={c * TILE - HALF} z={(r + 0.5) * TILE - HALF} rotY={Math.PI / 2} />
+          </Suspense>
+        );
+      })}
+    </>
+  );
+}
+
+// ── edge preview (drag highlight + hover hint) ────────────────────────────────
+function EdgePreview({ previewEdges, hoveredEdge }) {
+  const edgeToWorld = (type, idx) => {
+    if (type === "h") {
+      const r = Math.floor(idx / GRID), c = idx % GRID;
+      return { x: (c + 0.5) * TILE - HALF, z: r * TILE - HALF, w: TILE, d: TILE * 0.1 };
+    }
+    const r = Math.floor(idx / (GRID + 1)), c = idx % (GRID + 1);
+    return { x: c * TILE - HALF, z: (r + 0.5) * TILE - HALF, w: TILE * 0.1, d: TILE };
+  };
+  return (
+    <>
+      {previewEdges.map(({ type, idx }) => {
+        const { x, z, w, d } = edgeToWorld(type, idx);
+        return (
+          <mesh key={`pre-${type}${idx}`} position={[x, 0.02, z]}>
+            <boxGeometry args={[w, 0.006, d]} />
+            <meshBasicMaterial color="#DC143C" transparent opacity={0.85} />
+          </mesh>
+        );
+      })}
+      {hoveredEdge && previewEdges.length === 0 && (() => {
+        const { x, z, w, d } = edgeToWorld(hoveredEdge.type, hoveredEdge.idx);
+        return (
+          <mesh position={[x, 0.02, z]}>
+            <boxGeometry args={[w, 0.006, d]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.5} />
+          </mesh>
+        );
+      })()}
+    </>
   );
 }
 
@@ -314,9 +393,9 @@ function HitPlane({ x, z, idx, onDown, onDelete, onEnter, onHover, highlighted }
   return (
     <mesh
       rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.03, z]}
-      onPointerDown={e => { e.stopPropagation(); if (e.button === 2) onDelete(idx); else if (e.button === 0) onDown(e, idx); }}
-      onPointerEnter={e => { e.stopPropagation(); setHov(true); onHover(idx); if (e.buttons === 1) onEnter(idx); }}
-      onPointerLeave={() => { setHov(false); onHover(null); }}
+      onPointerDown={e => { e.stopPropagation(); if (e.button === 2) onDelete(e, idx); else if (e.button === 0) onDown(e, idx); }}
+      onPointerEnter={e => { e.stopPropagation(); setHov(true); onHover(e, idx); if (e.buttons === 1) onEnter(idx); }}
+      onPointerLeave={() => { setHov(false); onHover(null, null); }}
     >
       <planeGeometry args={[TILE, TILE]} />
       <meshBasicMaterial
@@ -371,7 +450,7 @@ function AtmosphereLights({ fogDensity, hour }) {
 }
 
 // ── full scene ────────────────────────────────────────────────────────────────
-function Scene({ grid, onDown, onDelete, onEnter, onHover, ghost, highlightCells, hdri, fogDensity, hour }) {
+function Scene({ grid, hEdges, vEdges, previewEdges, hoveredEdge, onDown, onDelete, onEnter, onHover, ghost, highlightCells, hdri, fogDensity, hour }) {
   return (
     <>
       <fogExp2 attach="fog" color={0x0a0608} density={fogDensity} />
@@ -395,6 +474,8 @@ function Scene({ grid, onDown, onDelete, onEnter, onHover, ghost, highlightCells
           </group>
         );
       })}
+      <EdgeWalls hEdges={hEdges} vEdges={vEdges} />
+      <EdgePreview previewEdges={previewEdges} hoveredEdge={hoveredEdge} />
       {ghost}
     </>
   );
@@ -406,6 +487,10 @@ export default function SceneMap3D() {
   const toast = useToast();
 
   const [grid,           setGrid]           = useState(() => Array(GRID * GRID).fill(null));
+  const [hEdges,         setHEdges]         = useState(() => new Array(812).fill(false));
+  const [vEdges,         setVEdges]         = useState(() => new Array(812).fill(false));
+  const [hoveredEdge,    setHoveredEdge]    = useState(null);
+  const [previewEdges,   setPreviewEdges]   = useState([]);
   const [tool,           setTool]           = useState("place");
   const [activeCategory, setActiveCategory] = useState("Walls");
   const [activeName,     setActiveName]     = useState("Stone");
@@ -422,6 +507,8 @@ export default function SceneMap3D() {
 
   // gridRef mirrors grid state so refs (undo stacks etc.) always see current value
   const gridRef        = useRef(grid);
+  const hEdgesRef      = useRef(new Array(812).fill(false));
+  const vEdgesRef      = useRef(new Array(812).fill(false));
   const undoStack      = useRef([]);
   const redoStack      = useRef([]);
   const autoSaveTimer  = useRef(null);
@@ -432,11 +519,13 @@ export default function SceneMap3D() {
   const shiftDragEnd   = useRef(null);
 
   // normal drag state
-  const dragging        = useRef(false);
-  const dragStart       = useRef(null);
-  const wallLineDir     = useRef(null);   // "h" | "v" | null — locked on first off-origin cell
-  const wallLineCurrent = useRef(null);   // last cell idx entered during wall drag
-  const isWallDrag      = useRef(false);  // whether current drag is a wall line
+  const dragging   = useRef(false);
+  const dragStart  = useRef(null);
+
+  // edge wall drag state
+  const wallAnchor  = useRef(null);   // { type: "h"|"v", idx } — snap target at mousedown
+  const wallAxis    = useRef(null);   // "h" | "v" — locked for entire drag
+  const wallPreview = useRef([]);     // [{ type, idx }, ...] — edges to commit on mouseup
 
   // ── grid mutator that keeps gridRef in sync ────────────────────────────────
   const applyGrid = useCallback((updater) => {
@@ -447,9 +536,23 @@ export default function SceneMap3D() {
     });
   }, []);
 
+  const applyHEdges = useCallback((arr) => {
+    hEdgesRef.current = arr;
+    setHEdges(arr);
+  }, []);
+
+  const applyVEdges = useCallback((arr) => {
+    vEdgesRef.current = arr;
+    setVEdges(arr);
+  }, []);
+
   // ── undo / redo ────────────────────────────────────────────────────────────
   const pushHistory = useCallback(() => {
-    undoStack.current = [...undoStack.current.slice(-39), [...gridRef.current]];
+    undoStack.current = [...undoStack.current.slice(-39), {
+      grid:   [...gridRef.current],
+      hEdges: [...hEdgesRef.current],
+      vEdges: [...vEdgesRef.current],
+    }];
     redoStack.current = [];
   }, []);
 
@@ -457,26 +560,37 @@ export default function SceneMap3D() {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current[undoStack.current.length - 1];
     undoStack.current = undoStack.current.slice(0, -1);
-    redoStack.current = [...redoStack.current, [...gridRef.current]];
-    applyGrid([...prev]);
-  }, [applyGrid]);
+    redoStack.current = [...redoStack.current, {
+      grid:   [...gridRef.current],
+      hEdges: [...hEdgesRef.current],
+      vEdges: [...vEdgesRef.current],
+    }];
+    applyGrid([...prev.grid]);
+    applyHEdges([...prev.hEdges]);
+    applyVEdges([...prev.vEdges]);
+  }, [applyGrid, applyHEdges, applyVEdges]);
 
   const redo = useCallback(() => {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current[redoStack.current.length - 1];
     redoStack.current = redoStack.current.slice(0, -1);
-    undoStack.current = [...undoStack.current, [...gridRef.current]];
-    applyGrid([...next]);
-  }, [applyGrid]);
+    undoStack.current = [...undoStack.current, {
+      grid:   [...gridRef.current],
+      hEdges: [...hEdgesRef.current],
+      vEdges: [...vEdgesRef.current],
+    }];
+    applyGrid([...next.grid]);
+    applyHEdges([...next.hEdges]);
+    applyVEdges([...next.vEdges]);
+  }, [applyGrid, applyHEdges, applyVEdges]);
 
   // ── derived values ─────────────────────────────────────────────────────────
   const activeUrl = ASSET_CATEGORIES[activeCategory]?.[activeName] ?? null;
-  const isWall    = activeUrl && WALL_URLS.has(activeUrl);
   const isFloor   = activeUrl && FLOOR_URLS.has(activeUrl);
 
   const filteredCategories = searchTerm.trim()
     ? Object.fromEntries(
-        Object.entries(ASSET_CATEGORIES)
+        Object.entries(PANEL_CATEGORIES)
           .map(([cat, items]) => [
             cat,
             Object.fromEntries(
@@ -487,7 +601,7 @@ export default function SceneMap3D() {
           ])
           .filter(([, items]) => Object.keys(items).length > 0)
       )
-    : ASSET_CATEGORIES;
+    : PANEL_CATEGORIES;
 
   // auto-select first result when searching
   useEffect(() => {
@@ -508,11 +622,16 @@ export default function SceneMap3D() {
     api.get(`/api/scenes/${groupId}`)
       .then(res => {
         setSceneName(res.data.name);
-        if (Array.isArray(res.data.data) && res.data.data.length > 0) {
-          applyGrid(res.data.data);
+        const d = res.data.data;
+        if (Array.isArray(d)) {
+          if (d.length > 0) applyGrid(d);
+        } else if (d && typeof d === "object") {
+          if (Array.isArray(d.grid)   && d.grid.length > 0)   applyGrid(d.grid);
+          if (Array.isArray(d.hEdges) && d.hEdges.length > 0) { hEdgesRef.current = d.hEdges; setHEdges(d.hEdges); }
+          if (Array.isArray(d.vEdges) && d.vEdges.length > 0) { vEdgesRef.current = d.vEdges; setVEdges(d.vEdges); }
         }
       })
-      .catch(() => {}); // 404 = no saved scene yet, start empty
+      .catch(() => {});
   }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── auto-save (30s debounce after grid changes) ────────────────────────────
@@ -520,21 +639,22 @@ export default function SceneMap3D() {
     if (!groupId) return;
     clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
-      const current = JSON.stringify(gridRef.current);
+      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current };
+      const current  = JSON.stringify(saveData);
       if (current === lastSavedGrid.current) return;
       try {
-        await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: gridRef.current });
+        await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: saveData });
         lastSavedGrid.current = current;
       } catch {
         // silent fail on auto-save
       }
     }, 30000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [grid, groupId, sceneName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [grid, hEdges, vEdges, groupId, sceneName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── paint / erase ──────────────────────────────────────────────────────────
   const paintCell = (idx) => {
-    if (!activeUrl || tool === "erase" || isWall) return;
+    if (!activeUrl || tool === "erase") return;
     applyGrid(prev => {
       const next = [...prev];
       const cur  = next[idx] ? { ...next[idx], walls: { ...next[idx].walls } } : mkCell();
@@ -568,7 +688,7 @@ export default function SceneMap3D() {
         indices.forEach(i => { next[i] = null; });
         return next;
       });
-    } else if (activeUrl && !isWall) {
+    } else if (activeUrl) {
       pushHistory();
       applyGrid(prev => {
         const next = [...prev];
@@ -584,25 +704,38 @@ export default function SceneMap3D() {
     setHighlightCells(new Set());
     shiftDragStart.current = null;
     shiftDragEnd.current   = null;
-  }, [tool, activeUrl, isFloor, isWall, brushRotation, applyGrid, pushHistory]);
+  }, [tool, activeUrl, isFloor, brushRotation, applyGrid, pushHistory]);
 
-  const applyWallLine = useCallback((startIdx, endIdx, dir) => {
-    if (!activeUrl) return;
-    const startCol = startIdx % GRID, startRow = Math.floor(startIdx / GRID);
-    const resolvedDir = dir ?? "h";
-    const cells = wallLineCells(startCol, startRow, endIdx, resolvedDir);
-    applyGrid(prev => {
-      const next = [...prev];
-      cells.forEach(i => {
-        const cur = next[i] ? { ...next[i], walls: { ...next[i].walls } } : mkCell();
-        if (resolvedDir === "h") cur.walls.h = { url: activeUrl, rotY: 0 };
-        else                      cur.walls.v = { url: activeUrl, rotY: 0 };
-        next[i] = cur;
-      });
-      return next;
-    });
-    setHighlightCells(new Set());
-  }, [activeUrl, applyGrid]);
+  const applyEdgeLine = useCallback((edgeList) => {
+    if (!edgeList || edgeList.length === 0) return;
+    const hIdxs = edgeList.filter(e => e.type === "h").map(e => e.idx);
+    const vIdxs = edgeList.filter(e => e.type === "v").map(e => e.idx);
+    if (hIdxs.length > 0) {
+      const next = [...hEdgesRef.current];
+      hIdxs.forEach(i => { next[i] = true; });
+      applyHEdges(next);
+    }
+    if (vIdxs.length > 0) {
+      const next = [...vEdgesRef.current];
+      vIdxs.forEach(i => { next[i] = true; });
+      applyVEdges(next);
+    }
+    setPreviewEdges([]);
+    wallPreview.current = [];
+  }, [applyHEdges, applyVEdges]);
+
+  const eraseEdge = useCallback((edge) => {
+    if (!edge) return;
+    if (edge.type === "h") {
+      const next = [...hEdgesRef.current];
+      next[edge.idx] = false;
+      applyHEdges(next);
+    } else {
+      const next = [...vEdgesRef.current];
+      next[edge.idx] = false;
+      applyVEdges(next);
+    }
+  }, [applyHEdges, applyVEdges]);
 
   // ── drag handlers ──────────────────────────────────────────────────────────
   const handleDown = (e, idx) => {
@@ -614,17 +747,18 @@ export default function SceneMap3D() {
     }
     pushHistory();
     if (tool === "erase") { eraseCell(idx); return; }
+    if (tool === "wall") {
+      const edge = snapToEdge(e.point, idx);
+      if (!edge) return;
+      wallAnchor.current  = edge;
+      wallAxis.current    = edge.type;
+      wallPreview.current = [edge];
+      setPreviewEdges([edge]);
+      return;
+    }
     dragging.current  = true;
     dragStart.current = { col: idx % GRID, row: Math.floor(idx / GRID), idx };
-    if (isWall) {
-      isWallDrag.current      = true;
-      wallLineDir.current     = null;
-      wallLineCurrent.current = idx;
-      setHighlightCells(new Set([idx]));
-    } else {
-      isWallDrag.current = false;
-      paintCell(idx);
-    }
+    paintCell(idx);
   };
 
   const handleEnter = (idx) => {
@@ -642,22 +776,46 @@ export default function SceneMap3D() {
       return;
     }
     if (tool === "erase") { eraseCell(idx); return; }
-    if (!dragging.current || !dragStart.current) return;
 
-    if (isWallDrag.current) {
-      const col = idx % GRID, row = Math.floor(idx / GRID);
-      const dc = col - dragStart.current.col, dr = row - dragStart.current.row;
-      if (!wallLineDir.current && (dc !== 0 || dr !== 0)) {
-        wallLineDir.current = Math.abs(dc) >= Math.abs(dr) ? "h" : "v";
+    if (tool === "wall" && wallAnchor.current) {
+      const cellCol = idx % GRID, cellRow = Math.floor(idx / GRID);
+      let currentEdgeIdx;
+      if (wallAxis.current === "h") {
+        const anchorRow = Math.floor(wallAnchor.current.idx / GRID);
+        currentEdgeIdx  = anchorRow * GRID + cellCol;
+      } else {
+        const anchorCol = wallAnchor.current.idx % (GRID + 1);
+        currentEdgeIdx  = cellRow * (GRID + 1) + anchorCol;
       }
-      wallLineCurrent.current = idx;
-      if (wallLineDir.current) {
-        setHighlightCells(wallLineCells(dragStart.current.col, dragStart.current.row, idx, wallLineDir.current));
-      }
+      const edgeIdxs = wallLineEdges(wallAnchor.current.idx, currentEdgeIdx, wallAxis.current);
+      const preview  = edgeIdxs.map(i => ({ type: wallAxis.current, idx: i }));
+      setPreviewEdges(preview);
+      wallPreview.current = preview;
       return;
     }
 
+    if (!dragging.current || !dragStart.current) return;
     paintCell(idx);
+  };
+
+  const handleHover = (e, idx) => {
+    setHoveredIdx(idx);
+    if (tool === "wall" && idx !== null && e) {
+      setHoveredEdge(snapToEdge(e.point, idx));
+    } else {
+      setHoveredEdge(null);
+    }
+  };
+
+  const handleDelete = (e, idx) => {
+    if (tool === "wall") {
+      const edge = snapToEdge(e.point, idx);
+      if (!edge) return;
+      pushHistory();
+      eraseEdge(edge);
+    } else {
+      eraseCell(idx);
+    }
   };
 
   // ── keyboard + pointerup ───────────────────────────────────────────────────
@@ -667,18 +825,15 @@ export default function SceneMap3D() {
         applyRectangle(shiftDragStart.current, shiftDragEnd.current);
         return;
       }
-      if (isWallDrag.current && dragStart.current) {
-        applyWallLine(
-          dragStart.current.idx,
-          wallLineCurrent.current ?? dragStart.current.idx,
-          wallLineDir.current
-        );
+      if (wallAnchor.current && wallPreview.current.length > 0) {
+        applyEdgeLine(wallPreview.current);
       }
-      dragging.current        = false;
-      dragStart.current       = null;
-      isWallDrag.current      = false;
-      wallLineDir.current     = null;
-      wallLineCurrent.current = null;
+      wallAnchor.current  = null;
+      wallAxis.current    = null;
+      wallPreview.current = [];
+      setPreviewEdges([]);
+      dragging.current  = false;
+      dragStart.current = null;
       setHighlightCells(new Set());
     };
 
@@ -701,15 +856,16 @@ export default function SceneMap3D() {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("keydown", onKey);
     };
-  }, [undo, redo, applyRectangle, applyWallLine]);
+  }, [undo, redo, applyRectangle, applyEdgeLine]);
 
   // ── save scene ────────────────────────────────────────────────────────────
   const saveScene = async () => {
     if (!groupId) { toast.error("No group ID — open Scene Maker from your GM dashboard."); return; }
     setSaving(true);
     try {
-      await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: gridRef.current });
-      lastSavedGrid.current = JSON.stringify(gridRef.current);
+      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current };
+      await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: saveData });
+      lastSavedGrid.current = JSON.stringify(saveData);
       toast.success("Scene saved.");
     } catch {
       toast.error("Failed to save scene.");
@@ -737,10 +893,10 @@ export default function SceneMap3D() {
     const x = (col + 0.5) * TILE - HALF, z = (row + 0.5) * TILE - HALF;
     return (
       <Suspense fallback={null}>
-        <GhostTile url={activeUrl} x={x} z={z} rotY={isWall ? 0 : brushRotation} />
+        <GhostTile url={activeUrl} x={x} z={z} rotY={brushRotation} />
       </Suspense>
     );
-  }, [tool, activeUrl, hoveredIdx, brushRotation, isWall]);
+  }, [tool, activeUrl, hoveredIdx, brushRotation]);
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
@@ -774,17 +930,26 @@ export default function SceneMap3D() {
         <div className="flex items-center gap-2">
           <span className="text-gray-500 text-xs">{activeCategory} · {activeName}</span>
           <div className="w-px h-4 bg-void-border mx-2" />
-          {["place", "erase"].map(t => (
-            <button key={t} onClick={() => setTool(t)}
+          {[
+            { id: "place", label: "Place" },
+            { id: "erase", label: "Erase" },
+            { id: "wall",  label: "Draw Walls" },
+          ].map(({ id, label }) => (
+            <button key={id} onClick={() => setTool(id)}
               className={`text-xs px-4 py-1.5 font-gothic tracking-wider rounded transition-colors ${
-                tool === t ? "bg-blood-dark text-white" : "border border-void-border text-gray-500 hover:text-gray-300"
+                tool === id ? "bg-blood-dark text-white" : "border border-void-border text-gray-500 hover:text-gray-300"
               }`}
             >
-              {t === "place" ? "Place" : "Erase"}
+              {label}
             </button>
           ))}
           <button
-            onClick={() => { pushHistory(); applyGrid(Array(GRID * GRID).fill(null)); }}
+            onClick={() => {
+              pushHistory();
+              applyGrid(Array(GRID * GRID).fill(null));
+              applyHEdges(new Array(812).fill(false));
+              applyVEdges(new Array(812).fill(false));
+            }}
             className="text-xs px-4 py-1.5 font-gothic tracking-wider rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood transition-colors ml-1"
           >
             Clear
@@ -800,8 +965,8 @@ export default function SceneMap3D() {
 
         <span className="text-gray-600 text-xs font-gothic">
           {tool === "erase" ? "Erasing"
+            : tool === "wall" ? "Draw Walls · click edge to start line"
             : isFloor ? `Painting floor · ${Math.round(brushRotation * 180 / Math.PI)}°`
-            : isWall  ? "Drawing wall"
             : activeUrl ? `Placing · ${Math.round(brushRotation * 180 / Math.PI)}° (R to rotate)`
             : "Select an asset"}
         </span>
@@ -867,15 +1032,19 @@ export default function SceneMap3D() {
       {/* ── CENTER — 3D Stage ── */}
       <main style={{ gridArea: "stage", position: "relative", background: "#050308", overflow: "hidden" }} onContextMenu={e => e.preventDefault()}>
         <Canvas shadows camera={{ position: [0, 5, 2.5], fov: 50, near: 0.01, far: 200 }} style={{ background: "#050308" }}
-          onCreated={({ gl }) => { gl.toneMapping = 4; gl.toneMappingExposure = 0.9; }}>
+          onCreated={({ gl }) => { gl.toneMapping = 0; }}>
           <OrbitControls enablePan enableZoom enableRotate={false} mouseButtons={{ MIDDLE: 2 }} screenSpacePanning panSpeed={1.5} zoomSpeed={1.2} minDistance={0.5} maxDistance={15} />
           <Suspense fallback={null}>
             <Scene
               grid={grid}
+              hEdges={hEdges}
+              vEdges={vEdges}
+              previewEdges={previewEdges}
+              hoveredEdge={hoveredEdge}
               onDown={handleDown}
-              onDelete={eraseCell}
+              onDelete={handleDelete}
               onEnter={handleEnter}
-              onHover={setHoveredIdx}
+              onHover={handleHover}
               ghost={ghostElement}
               highlightCells={highlightCells}
               hdri={hdri}
@@ -883,9 +1052,6 @@ export default function SceneMap3D() {
               hour={hour}
             />
           </Suspense>
-          <EffectComposer>
-            <Bloom luminanceThreshold={1} luminanceSmoothing={0.9} intensity={0.6} />
-          </EffectComposer>
         </Canvas>
 
         {/* Bottom controls bar */}

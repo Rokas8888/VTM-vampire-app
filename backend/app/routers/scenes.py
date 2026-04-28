@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Any
+from typing import Any
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.user import User, UserRole
@@ -14,14 +14,14 @@ router = APIRouter(prefix="/api/scenes", tags=["scenes"])
 
 class SceneSave(BaseModel):
     name: str
-    data: List[Any]
+    data: Any
 
 
 class SceneOut(BaseModel):
     id:         int
     group_id:   int
     name:       str
-    data:       List[Any]
+    data:       Any
     updated_at: datetime
 
     class Config:
