@@ -410,18 +410,10 @@ function HitPlane({ x, z, idx, onDown, onDelete, onEnter, onHover, highlighted }
 
 // ── atmosphere lights ─────────────────────────────────────────────────────────
 function AtmosphereLights({ fogDensity, hour }) {
-  const fillRef   = useRef();
-  const candleRef = useRef();
+  const fillRef = useRef();
 
   const isNight = hour < 6 || hour >= 19;
   const isDusk  = (hour >= 17 && hour < 19) || (hour >= 5 && hour < 7);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (candleRef.current) {
-      candleRef.current.intensity = 0.08 * (0.7 + 0.3 * Math.sin(t * 3.1) + 0.15 * Math.sin(t * 7.3));
-    }
-  });
 
   return (
     <>
@@ -444,7 +436,6 @@ function AtmosphereLights({ fogDensity, hour }) {
         intensity={isNight ? 0.12 : 0.08}
       />
       <pointLight position={[2, 1.5, -1]} color={0x6a1010} intensity={0.5} distance={8} decay={2} />
-      <pointLight ref={candleRef} position={[0, 0.3, 0]} color={0xffb86b} intensity={0.08} distance={3} decay={2} />
     </>
   );
 }
@@ -492,8 +483,8 @@ export default function SceneMap3D() {
   const [hoveredEdge,    setHoveredEdge]    = useState(null);
   const [previewEdges,   setPreviewEdges]   = useState([]);
   const [tool,           setTool]           = useState("place");
-  const [activeCategory, setActiveCategory] = useState("Walls");
-  const [activeName,     setActiveName]     = useState("Stone");
+  const [activeCategory, setActiveCategory] = useState("Floors");
+  const [activeName,     setActiveName]     = useState("Stone Tile");
   const [hdri,           setHdri]           = useState("night");
   const [fogDensity,     setFogDensity]     = useState(0.18);
   const [hour,           setHour]           = useState(23);
@@ -654,7 +645,7 @@ export default function SceneMap3D() {
 
   // ── paint / erase ──────────────────────────────────────────────────────────
   const paintCell = (idx) => {
-    if (!activeUrl || tool === "erase") return;
+    if (!activeUrl || tool === "erase" || WALL_URLS.has(activeUrl)) return;
     applyGrid(prev => {
       const next = [...prev];
       const cur  = next[idx] ? { ...next[idx], walls: { ...next[idx].walls } } : mkCell();
