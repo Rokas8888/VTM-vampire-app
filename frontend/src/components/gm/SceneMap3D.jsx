@@ -934,7 +934,6 @@ export default function SceneMap3D() {
           {[
             { id: "place", label: "Place" },
             { id: "erase", label: "Erase" },
-            { id: "wall",  label: "Draw Walls" },
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setTool(id)}
               className={`text-xs px-4 py-1.5 font-gothic tracking-wider rounded transition-colors ${
