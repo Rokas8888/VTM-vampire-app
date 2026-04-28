@@ -80,7 +80,7 @@ export default function App() {
             <SceneMapPrototype />
           </PrivateRoute>
         } />
-        <Route path="/scene-3d" element={
+        <Route path="/scene-3d/:groupId" element={
           <PrivateRoute allowedRoles={["gm", "admin"]}>
             <Suspense fallback={<div className="min-h-screen bg-void flex items-center justify-center"><p className="font-gothic text-blood animate-pulse">Loading 3D...</p></div>}>
               <SceneMap3D />

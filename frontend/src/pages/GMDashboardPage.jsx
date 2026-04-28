@@ -800,6 +800,12 @@ export default function GMDashboardPage() {
                   >
                     ⚔ Session Mode
                   </button>
+                  <button
+                    onClick={() => window.open(`/scene-3d/${selectedGroup.id}`, "_blank")}
+                    className="vtm-btn-secondary text-xs py-1.5 px-3"
+                  >
+                    🗺 Scene Maker
+                  </button>
                 </div>
               </div>
 

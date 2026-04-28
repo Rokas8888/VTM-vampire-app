@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, Suspense, useMemo, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
+import api from "../../services/api";
+import { useToast } from "../../store/toastStore";
 
 // ── grid config ───────────────────────────────────────────────────────────────
 const GRID  = 28;
@@ -399,6 +402,9 @@ function Scene({ grid, onDown, onDelete, onEnter, onHover, ghost, highlightCells
 
 // ── main component ────────────────────────────────────────────────────────────
 export default function SceneMap3D() {
+  const { groupId } = useParams();
+  const toast = useToast();
+
   const [grid,           setGrid]           = useState(() => Array(GRID * GRID).fill(null));
   const [tool,           setTool]           = useState("place");
   const [activeCategory, setActiveCategory] = useState("Walls");
@@ -410,11 +416,16 @@ export default function SceneMap3D() {
   const [brushRotation,  setBrushRotation]  = useState(0);
   const [hoveredIdx,     setHoveredIdx]     = useState(null);
   const [highlightCells, setHighlightCells] = useState(new Set());
+  const [sceneName,      setSceneName]      = useState("Untitled Scene");
+  const [saving,         setSaving]         = useState(false);
+  const [editingName,    setEditingName]    = useState(false);
 
   // gridRef mirrors grid state so refs (undo stacks etc.) always see current value
-  const gridRef    = useRef(grid);
-  const undoStack  = useRef([]);
-  const redoStack  = useRef([]);
+  const gridRef        = useRef(grid);
+  const undoStack      = useRef([]);
+  const redoStack      = useRef([]);
+  const autoSaveTimer  = useRef(null);
+  const lastSavedGrid  = useRef(null);
 
   // shift+drag rectangle selection
   const shiftDragStart = useRef(null);
@@ -490,6 +501,36 @@ export default function SceneMap3D() {
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hourLabel = `${String(Math.floor(hour)).padStart(2, "0")}:00`;
+
+  // ── fetch scene on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!groupId) return;
+    api.get(`/api/scenes/${groupId}`)
+      .then(res => {
+        setSceneName(res.data.name);
+        if (Array.isArray(res.data.data) && res.data.data.length > 0) {
+          applyGrid(res.data.data);
+        }
+      })
+      .catch(() => {}); // 404 = no saved scene yet, start empty
+  }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── auto-save (30s debounce after grid changes) ────────────────────────────
+  useEffect(() => {
+    if (!groupId) return;
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      const current = JSON.stringify(gridRef.current);
+      if (current === lastSavedGrid.current) return;
+      try {
+        await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: gridRef.current });
+        lastSavedGrid.current = current;
+      } catch {
+        // silent fail on auto-save
+      }
+    }, 30000);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [grid, groupId, sceneName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── paint / erase ──────────────────────────────────────────────────────────
   const paintCell = (idx) => {
@@ -662,6 +703,21 @@ export default function SceneMap3D() {
     };
   }, [undo, redo, applyRectangle, applyWallLine]);
 
+  // ── save scene ────────────────────────────────────────────────────────────
+  const saveScene = async () => {
+    if (!groupId) { toast.error("No group ID — open Scene Maker from your GM dashboard."); return; }
+    setSaving(true);
+    try {
+      await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: gridRef.current });
+      lastSavedGrid.current = JSON.stringify(gridRef.current);
+      toast.success("Scene saved.");
+    } catch {
+      toast.error("Failed to save scene.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ── fill floor ─────────────────────────────────────────────────────────────
   const fillFloor = () => {
     if (!isFloor) return;
@@ -692,7 +748,28 @@ export default function SceneMap3D() {
 
       {/* ── TOPBAR ── */}
       <div className="flex items-center justify-between px-4 border-b border-void-border bg-void-light" style={{ gridArea: "topbar" }}>
-        <span className="font-gothic text-blood text-sm tracking-widest">Scene Maker</span>
+        <div className="flex items-center gap-3">
+          <span className="font-gothic text-blood text-sm tracking-widest">Scene Maker</span>
+          <div className="w-px h-4 bg-void-border" />
+          {editingName ? (
+            <input
+              autoFocus
+              value={sceneName}
+              onChange={e => setSceneName(e.target.value)}
+              onBlur={() => setEditingName(false)}
+              onKeyDown={e => { if (e.key === "Enter") setEditingName(false); }}
+              className="bg-void-mid border border-blood rounded px-2 py-0.5 text-xs text-gray-200 font-gothic tracking-wider w-36 focus:outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => setEditingName(true)}
+              className="text-xs text-gray-400 hover:text-gray-200 font-gothic tracking-wider transition-colors"
+              title="Click to rename"
+            >
+              {sceneName}
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-gray-500 text-xs">{activeCategory} · {activeName}</span>
@@ -711,6 +788,13 @@ export default function SceneMap3D() {
             className="text-xs px-4 py-1.5 font-gothic tracking-wider rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood transition-colors ml-1"
           >
             Clear
+          </button>
+          <button
+            onClick={saveScene}
+            disabled={saving || !groupId}
+            className="text-xs px-4 py-1.5 font-gothic tracking-wider rounded bg-blood-dark text-white hover:bg-blood transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-1"
+          >
+            {saving ? "Saving…" : "Save"}
           </button>
         </div>
 

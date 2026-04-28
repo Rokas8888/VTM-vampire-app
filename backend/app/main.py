@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, game_data, characters, groups, monsters, admin, dice, conditions, notes, npcs, resonance, portraits
+from app.routers import auth, game_data, characters, groups, monsters, admin, dice, conditions, notes, npcs, resonance, portraits, scenes
 
 app = FastAPI(title="VTM-GG API", version="1.0.0")
 
@@ -28,6 +28,7 @@ app.include_router(notes.router)
 app.include_router(npcs.router)
 app.include_router(resonance.router)
 app.include_router(portraits.router)
+app.include_router(scenes.router)
 
 # Serve uploaded portraits as static files
 _uploads_dir = "/app/uploads"
