@@ -228,10 +228,9 @@ const WALL_URLS  = new Set([...Object.values(ASSET_CATEGORIES.Walls), ...Object.
 const FLOOR_URLS = new Set(Object.values(ASSET_CATEGORIES.Floors));
 const STAIR_URLS = new Set(Object.values(ASSET_CATEGORIES.Stairs));
 
-// Left panel shows all categories except Walls (walls use dedicated edge tool)
-const PANEL_CATEGORIES = Object.fromEntries(
-  Object.entries(ASSET_CATEGORIES).filter(([cat]) => cat !== "Walls")
-);
+// Selecting any asset in these categories auto-switches to Draw Walls mode
+const WALL_CATS = new Set(["Walls", "Doors"]);
+const PANEL_CATEGORIES = ASSET_CATEGORIES;
 
 const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
 const isEmpty = (c) => !c || (!c.floor && !c.object);
@@ -327,12 +326,14 @@ function CellMeshes({ cell, x, z }) {
 }
 
 // ── edge walls ────────────────────────────────────────────────────────────────
+const DEFAULT_WALL_URL = ASSET_CATEGORIES.Walls["Stone"];
+
 function EdgeWalls({ hEdges, vEdges }) {
-  const wallUrl = ASSET_CATEGORIES.Walls["Stone"];
   return (
     <>
-      {hEdges.map((on, i) => {
-        if (!on) return null;
+      {hEdges.map((url, i) => {
+        if (!url) return null;
+        const wallUrl = typeof url === "string" ? url : DEFAULT_WALL_URL;
         const r = Math.floor(i / GRID), c = i % GRID;
         return (
           <Suspense key={`h${i}`} fallback={null}>
@@ -340,8 +341,9 @@ function EdgeWalls({ hEdges, vEdges }) {
           </Suspense>
         );
       })}
-      {vEdges.map((on, i) => {
-        if (!on) return null;
+      {vEdges.map((url, i) => {
+        if (!url) return null;
+        const wallUrl = typeof url === "string" ? url : DEFAULT_WALL_URL;
         const r = Math.floor(i / (GRID + 1)), c = i % (GRID + 1);
         return (
           <Suspense key={`v${i}`} fallback={null}>
@@ -478,8 +480,8 @@ export default function SceneMap3D() {
   const toast = useToast();
 
   const [grid,           setGrid]           = useState(() => Array(GRID * GRID).fill(null));
-  const [hEdges,         setHEdges]         = useState(() => new Array(812).fill(false));
-  const [vEdges,         setVEdges]         = useState(() => new Array(812).fill(false));
+  const [hEdges,         setHEdges]         = useState(() => new Array(812).fill(null));
+  const [vEdges,         setVEdges]         = useState(() => new Array(812).fill(null));
   const [hoveredEdge,    setHoveredEdge]    = useState(null);
   const [previewEdges,   setPreviewEdges]   = useState([]);
   const [tool,           setTool]           = useState("place");
@@ -498,8 +500,8 @@ export default function SceneMap3D() {
 
   // gridRef mirrors grid state so refs (undo stacks etc.) always see current value
   const gridRef        = useRef(grid);
-  const hEdgesRef      = useRef(new Array(812).fill(false));
-  const vEdgesRef      = useRef(new Array(812).fill(false));
+  const hEdgesRef      = useRef(new Array(812).fill(null));
+  const vEdgesRef      = useRef(new Array(812).fill(null));
   const undoStack      = useRef([]);
   const redoStack      = useRef([]);
   const autoSaveTimer  = useRef(null);
@@ -618,8 +620,14 @@ export default function SceneMap3D() {
           if (d.length > 0) applyGrid(d);
         } else if (d && typeof d === "object") {
           if (Array.isArray(d.grid)   && d.grid.length > 0)   applyGrid(d.grid);
-          if (Array.isArray(d.hEdges) && d.hEdges.length > 0) { hEdgesRef.current = d.hEdges; setHEdges(d.hEdges); }
-          if (Array.isArray(d.vEdges) && d.vEdges.length > 0) { vEdgesRef.current = d.vEdges; setVEdges(d.vEdges); }
+          if (Array.isArray(d.hEdges) && d.hEdges.length > 0) {
+            const h = d.hEdges.map(v => v === true ? DEFAULT_WALL_URL : (v || null));
+            hEdgesRef.current = h; setHEdges(h);
+          }
+          if (Array.isArray(d.vEdges) && d.vEdges.length > 0) {
+            const v = d.vEdges.map(v => v === true ? DEFAULT_WALL_URL : (v || null));
+            vEdgesRef.current = v; setVEdges(v);
+          }
         }
       })
       .catch(() => {});
@@ -698,32 +706,33 @@ export default function SceneMap3D() {
   }, [tool, activeUrl, isFloor, brushRotation, applyGrid, pushHistory]);
 
   const applyEdgeLine = useCallback((edgeList) => {
-    if (!edgeList || edgeList.length === 0) return;
+    if (!edgeList || edgeList.length === 0 || !activeUrl) return;
+    const url   = activeUrl;
     const hIdxs = edgeList.filter(e => e.type === "h").map(e => e.idx);
     const vIdxs = edgeList.filter(e => e.type === "v").map(e => e.idx);
     if (hIdxs.length > 0) {
       const next = [...hEdgesRef.current];
-      hIdxs.forEach(i => { next[i] = true; });
+      hIdxs.forEach(i => { next[i] = url; });
       applyHEdges(next);
     }
     if (vIdxs.length > 0) {
       const next = [...vEdgesRef.current];
-      vIdxs.forEach(i => { next[i] = true; });
+      vIdxs.forEach(i => { next[i] = url; });
       applyVEdges(next);
     }
     setPreviewEdges([]);
     wallPreview.current = [];
-  }, [applyHEdges, applyVEdges]);
+  }, [applyHEdges, applyVEdges, activeUrl]);
 
   const eraseEdge = useCallback((edge) => {
     if (!edge) return;
     if (edge.type === "h") {
       const next = [...hEdgesRef.current];
-      next[edge.idx] = false;
+      next[edge.idx] = null;
       applyHEdges(next);
     } else {
       const next = [...vEdgesRef.current];
-      next[edge.idx] = false;
+      next[edge.idx] = null;
       applyVEdges(next);
     }
   }, [applyHEdges, applyVEdges]);
@@ -938,8 +947,8 @@ export default function SceneMap3D() {
             onClick={() => {
               pushHistory();
               applyGrid(Array(GRID * GRID).fill(null));
-              applyHEdges(new Array(812).fill(false));
-              applyVEdges(new Array(812).fill(false));
+              applyHEdges(new Array(812).fill(null));
+              applyVEdges(new Array(812).fill(null));
             }}
             className="text-xs px-4 py-1.5 font-gothic tracking-wider rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood transition-colors ml-1"
           >
@@ -994,7 +1003,7 @@ export default function SceneMap3D() {
                   ? "text-blood border-blood bg-void-light"
                   : "text-gray-500 border-transparent hover:text-gray-300"
               }`}
-              onClick={() => { setActiveCategory(cat); setActiveName(Object.keys(items)[0]); setTool("place"); }}
+              onClick={() => { setActiveCategory(cat); setActiveName(Object.keys(items)[0]); setTool(WALL_CATS.has(cat) ? "wall" : "place"); }}
             >
               {cat}
             </button>
@@ -1008,7 +1017,7 @@ export default function SceneMap3D() {
                         ? "text-blood border-blood-dark bg-void-mid"
                         : "text-gray-500 border-transparent hover:text-gray-300"
                     }`}
-                    onClick={() => { setActiveName(name); setTool("place"); }}
+                    onClick={() => { setActiveName(name); setTool(WALL_CATS.has(activeCategory) ? "wall" : "place"); }}
                   >
                     {name}
                   </button>
