@@ -435,21 +435,6 @@ export default function SessionModePage() {
     finally { setGmStatSaving(false); }
   }, [editChar]);
 
-  // Inline card stat adjustments (no overlay needed)
-  const handleCardGmAdjust = useCallback(async (charId, key, value) => {
-    try {
-      await api.put(`/api/characters/${charId}/gm-adjust`, { [key]: value });
-      refresh();
-    } catch (_) {}
-  }, [refresh]);
-
-  const handleCardSessionAdjust = useCallback(async (charId, key, value) => {
-    try {
-      await api.put(`/api/characters/${charId}/session`, { [key]: value });
-      refresh();
-    } catch (_) {}
-  }, [refresh]);
-
   const openFullEdit = useCallback(async (charId) => {
     setLoadingEdit(true);
     setEditChar(null);
@@ -536,6 +521,21 @@ export default function SessionModePage() {
       setError(e.response?.data?.detail ?? "Failed to load group.");
     }
   }, [groupId, fetchConditions]);
+
+  // Inline card stat adjustments (no overlay needed)
+  const handleCardGmAdjust = useCallback(async (charId, key, value) => {
+    try {
+      await api.put(`/api/characters/${charId}/gm-adjust`, { [key]: value });
+      refresh();
+    } catch (_) {}
+  }, [refresh]);
+
+  const handleCardSessionAdjust = useCallback(async (charId, key, value) => {
+    try {
+      await api.put(`/api/characters/${charId}/session`, { [key]: value });
+      refresh();
+    } catch (_) {}
+  }, [refresh]);
 
   useEffect(() => {
     refresh();
