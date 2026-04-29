@@ -165,22 +165,14 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer,
-  manageMode, isActive, onActivate, statOverrides, onStatChange, onFullEdit }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
 
   return (
     <div
-      onClick={manageMode && !isActive ? onActivate : undefined}
-      className={`border rounded-lg p-4 flex flex-col gap-4 transition-colors ${
-        manageMode && !isActive
-          ? "opacity-50 border-void-border cursor-pointer hover:opacity-70"
-          : isActive
-          ? "border-blood opacity-100"
-          : "border-void-border hover:border-blood/40"
-      }`}
+      className="border border-void-border hover:border-blood/40 rounded-lg p-4 flex flex-col gap-4 transition-colors"
       style={clanCardStyle(char.clan_name)}
     >
 
@@ -230,30 +222,12 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
           { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
           { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
           { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger" },
-        ].map(({ key, label, max, variant }) => {
-          const isManagedStat = manageMode === key;
-          const displayVal    = statOverrides[key] ?? char[key] ?? 0;
-          return (
-            <div key={key} className="flex items-center gap-2">
-              <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
-              <DotTracker value={displayVal} max={max} variant={variant} />
-              {isActive && isManagedStat && (
-                <div className="flex items-center gap-1 ml-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onStatChange(key, -1); }}
-                    disabled={displayVal <= 0}
-                    className="w-5 h-5 rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood disabled:opacity-30 text-xs leading-none transition-colors"
-                  >−</button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onStatChange(key, +1); }}
-                    disabled={displayVal >= max}
-                    className="w-5 h-5 rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood disabled:opacity-30 text-xs leading-none transition-colors"
-                  >+</button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        ].map(({ key, label, max, variant }) => (
+          <div key={key} className="flex items-center gap-2">
+            <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
+            <DotTracker value={char[key] ?? 0} max={max} variant={variant} />
+          </div>
+        ))}
       </div>
 
       {/* Health + Willpower — always 15 boxes, greyed out unused */}
@@ -556,37 +530,6 @@ export default function SessionModePage() {
               ? `Synced ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
               : "Connecting…"}
           </span>
-          {/* Manage dropdown — GM only */}
-          {isGM && (
-            <div className="relative" ref={manageRef}>
-              <button
-                onClick={() => setShowManageDropdown((v) => !v)}
-                className="text-xs font-gothic tracking-wider text-gray-500 hover:text-blood border border-void-border hover:border-blood rounded px-3 py-1 transition-colors"
-              >
-                Manage ▾
-              </button>
-              {showManageDropdown && (
-                <div className="absolute right-0 top-full mt-1 bg-void border border-void-border rounded shadow-lg z-20 min-w-[150px]">
-                  {[
-                    { key: "humanity",      label: "Humanity" },
-                    { key: "blood_potency", label: "Blood Potency" },
-                  ].map(({ key, label }) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setManageMode(key);
-                        setActiveCard(null);
-                        setShowManageDropdown(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-gothic text-gray-400 hover:text-blood hover:bg-void-light transition-colors first:rounded-t last:rounded-b"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           <button onClick={() => navigate("/gm")}
             className="text-gray-600 hover:text-gray-300 text-xs font-gothic tracking-wider transition-colors">
             ← Dashboard
@@ -596,21 +539,6 @@ export default function SessionModePage() {
 
       {error && (
         <div className="bg-blood-dark/20 border border-blood-dark rounded p-3 mb-4 text-red-300 text-sm">{error}</div>
-      )}
-
-      {/* Management mode banner */}
-      {manageMode && (
-        <div className="flex items-center justify-between px-4 py-2 bg-blood-dark/20 border border-blood-dark/60 rounded mb-4 gap-3">
-          <span className="text-sm font-gothic text-blood">
-            ⚑ {manageMode === "humanity" ? "Humanity" : "Blood Potency"} Mode — tap a character card to adjust
-          </span>
-          <button
-            onClick={() => { setManageMode(null); setActiveCard(null); }}
-            className="text-xs font-gothic text-blood-dark hover:text-blood border border-blood-dark hover:border-blood rounded px-2 py-0.5 transition-colors shrink-0"
-          >
-            Exit
-          </button>
-        </div>
       )}
 
       {!group && !error && (
@@ -631,11 +559,6 @@ export default function SessionModePage() {
               onConditionsChange={() => refreshConditionsFor(char.id)}
               lastRoll={lastRollMap[player] ?? null}
               onOpenRetainer={openRetainer}
-              manageMode={manageMode}
-              isActive={activeCard === char.id}
-              onActivate={() => setActiveCard(char.id)}
-              statOverrides={statOverrides[char.id] ?? {}}
-              onStatChange={(stat, delta) => handleStatChange(char.id, stat, delta)}
               onFullEdit={isGM ? openFullEdit : undefined}
             />
           ))}
@@ -656,11 +579,13 @@ export default function SessionModePage() {
               {loadingEdit ? "Opening…" : editChar?.name}
             </span>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-blood/60 font-gothic tracking-wider border border-blood-dark/40 rounded px-2 py-0.5">
-                Full Edit — no XP cost
-              </span>
+              {savedFlash && (
+                <span className="text-xs text-green-500 font-gothic tracking-wider transition-opacity">
+                  ✓ Saved
+                </span>
+              )}
               <button
-                onClick={() => setEditChar(null)}
+                onClick={closeFullEdit}
                 className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
               >
                 ✕ Close
@@ -676,20 +601,20 @@ export default function SessionModePage() {
                 freeEdit
                 onImprove={async (traitType, traitName, extra = {}) => {
                   const res = await api.post(`/api/characters/${editChar.id}/improve`, { trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true });
-                  setEditChar(res.data);
+                  setEditChar(res.data); flashSaved();
                 }}
                 onUnimprove={async (traitType, traitName, extra = {}) => {
                   const res = await api.post(`/api/characters/${editChar.id}/unimprove`, { trait_type: traitType, trait_name: traitName || undefined, ...extra });
-                  setEditChar(res.data);
+                  setEditChar(res.data); flashSaved();
                 }}
-                onCharacterUpdate={(updated) => setEditChar(updated)}
-                onAddWeapon={async (w) => { const res = await api.post(`/api/characters/${editChar.id}/weapons`, w); setEditChar(res.data); }}
-                onDeleteWeapon={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/weapons/${id}`); setEditChar(res.data); }}
-                onAddPossession={async (p) => { const res = await api.post(`/api/characters/${editChar.id}/possessions`, p); setEditChar(res.data); }}
-                onDeletePossession={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/possessions/${id}`); setEditChar(res.data); }}
-                onAddSpecialty={async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${editChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setEditChar(res.data); }}
-                onDeleteSpecialty={async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${editChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setEditChar(res.data); }}
-                onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${editChar.id}/claim-predator-power`, { power_id: powerId }); setEditChar(res.data); } catch {} }}
+                onCharacterUpdate={(updated) => { setEditChar(updated); flashSaved(); }}
+                onAddWeapon={async (w) => { const res = await api.post(`/api/characters/${editChar.id}/weapons`, w); setEditChar(res.data); flashSaved(); }}
+                onDeleteWeapon={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/weapons/${id}`); setEditChar(res.data); flashSaved(); }}
+                onAddPossession={async (p) => { const res = await api.post(`/api/characters/${editChar.id}/possessions`, p); setEditChar(res.data); flashSaved(); }}
+                onDeletePossession={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/possessions/${id}`); setEditChar(res.data); flashSaved(); }}
+                onAddSpecialty={async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${editChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setEditChar(res.data); flashSaved(); }}
+                onDeleteSpecialty={async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${editChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setEditChar(res.data); flashSaved(); }}
+                onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${editChar.id}/claim-predator-power`, { power_id: powerId }); setEditChar(res.data); flashSaved(); } catch {} }}
               />
             ) : null}
           </div>
