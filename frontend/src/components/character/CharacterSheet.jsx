@@ -1055,13 +1055,11 @@ export default function CharacterSheet({
   // Called after the remorse dice roll
   const handleRemorseResult = (success) => {
     if (success) {
-      // Stains wiped — humanity restored
-      const restored = currentHumanity + stains;
-      performSave(restored, 0);
+      // Success — stains cleared, humanity unchanged
+      performSave(currentHumanity, 0);
     } else {
-      // Failed — lose 1 humanity, stains cleared
-      const fallen = Math.max(0, currentHumanity - 1);
-      performSave(fallen, 0);
+      // Failed — permanently lose 1 humanity, stains cleared
+      performSave(Math.max(0, currentHumanity - 1), 0);
     }
     setShowRemorse(false);
   };
