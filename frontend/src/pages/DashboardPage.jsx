@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useAuthStore from "../store/authStore";
 import useWizardStore from "../store/wizardStore";
 import api from "../services/api";
@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuthStore();
   const { resetDraft } = useWizardStore();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // character list
   const [characters, setCharacters] = useState([]);
@@ -160,6 +161,12 @@ export default function DashboardPage() {
     setTempMode(false);
   };
 
+  // ── Auto-open character from URL param on load ────────────────────────────
+  useEffect(() => {
+    const charId = searchParams.get("char");
+    if (charId) openCharacter(Number(charId));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load character list + groups ──────────────────────────────────────────
   useEffect(() => {
     api.get("/api/characters/mine")
@@ -201,17 +208,19 @@ export default function DashboardPage() {
   const openCharacter = (id) => {
     resetAllPanels();
     setLoadingDetail(true);
+    setSearchParams({ char: id });
     api.get(`/api/characters/${id}`)
       .then((res) => {
         setSelected(res.data);
         setSessionHunger(res.data.current_hunger ?? 0);
         setLoadingDetail(false);
       })
-      .catch(() => setLoadingDetail(false));
+      .catch(() => { setLoadingDetail(false); setSearchParams({}); });
   };
 
   const closeDetail = () => {
     setSelected(null);
+    setSearchParams({});
     resetAllPanels();
   };
 

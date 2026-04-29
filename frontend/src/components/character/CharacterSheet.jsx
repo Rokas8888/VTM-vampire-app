@@ -243,6 +243,8 @@ const RITUAL_DISC_NAMES = ["Blood Sorcery"];
 
 function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove, availableXp, onClaimFreePower, tempDots, onAddTempDot, onRemoveTempDot, freeEdit, onRemoveDiscipline, learnedRituals = [], onOpenRitualBook }) {
   const [expandedRituals, setExpandedRituals] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
   const toggleRitual = (id) => setExpandedRituals(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -320,12 +322,32 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
           <span className="font-gothic text-lg text-gray-200">{disc.name}</span>
-          {freeEdit && onRemoveDiscipline && (
+          {(freeEdit || onImprove) && onRemoveDiscipline && !deleting && (
             <button
-              onClick={() => onRemoveDiscipline(disc.id)}
+              onClick={() => { setDeleting(true); setDeleteText(""); }}
               className="text-gray-700 hover:text-blood text-xs transition-colors"
               title="Remove discipline"
             >✕</button>
+          )}
+          {deleting && (
+            <span className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                placeholder='type DELETE'
+                className="bg-void border border-blood-dark rounded px-2 py-0.5 text-xs text-gray-200 w-24 focus:outline-none focus:border-blood"
+              />
+              <button
+                onClick={() => { if (deleteText === "DELETE") onRemoveDiscipline(disc.id); }}
+                disabled={deleteText !== "DELETE"}
+                className="text-xs text-blood disabled:text-gray-700 hover:text-white transition-colors font-gothic"
+              >confirm</button>
+              <button
+                onClick={() => { setDeleting(false); setDeleteText(""); }}
+                className="text-xs text-gray-600 hover:text-gray-300 transition-colors"
+              >cancel</button>
+            </span>
           )}
           {!isInClan && (onImprove || onUnimprove) && (
             <span className="ml-2 text-xs text-gray-600 italic">out-of-clan</span>
@@ -1411,7 +1433,7 @@ export default function CharacterSheet({
                   onAddTempDot={tempMode ? (discId) => handleAddTempDot("disciplines", discId) : undefined}
                   onRemoveTempDot={tempMode ? (discId) => handleRemoveTempDot("disciplines", discId) : undefined}
                   freeEdit={freeEdit}
-                  onRemoveDiscipline={freeEdit ? async (discId) => {
+                  onRemoveDiscipline={(freeEdit || onImprove) ? async (discId) => {
                     const res = await api.delete(`/api/characters/${character.id}/disciplines/${discId}`);
                     if (onCharacterUpdate) onCharacterUpdate(res.data);
                   } : undefined}
