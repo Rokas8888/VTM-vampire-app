@@ -439,6 +439,16 @@ def gm_adjust_stats(
         char.health = max(1, min(15, body.health))
     if body.willpower is not None:
         char.willpower = max(1, min(10, body.willpower))
+    if body.current_hunger is not None:
+        char.current_hunger = max(0, min(5, body.current_hunger))
+    if body.health_superficial is not None:
+        char.health_superficial = max(0, min(char.health, body.health_superficial))
+    if body.health_aggravated is not None:
+        char.health_aggravated = max(0, min(char.health, body.health_aggravated))
+    if body.willpower_superficial is not None:
+        char.willpower_superficial = max(0, min(char.willpower, body.willpower_superficial))
+    if body.willpower_aggravated is not None:
+        char.willpower_aggravated = max(0, min(char.willpower, body.willpower_aggravated))
 
     db.commit()
     return load_full_character(char.id, db)

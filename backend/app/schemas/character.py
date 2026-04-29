@@ -172,11 +172,16 @@ class CharacterUpdateRequest(BaseModel):
 
 
 class GMStatAdjustRequest(BaseModel):
-    """GM/admin adjustment of permanent character stats."""
+    """GM/admin adjustment of permanent and session character stats."""
     humanity: Optional[int] = None
     blood_potency: Optional[int] = None
     health: Optional[int] = None
     willpower: Optional[int] = None
+    current_hunger: Optional[int] = None
+    health_superficial: Optional[int] = None
+    health_aggravated: Optional[int] = None
+    willpower_superficial: Optional[int] = None
+    willpower_aggravated: Optional[int] = None
 
 
 class XPGrantRequest(BaseModel):

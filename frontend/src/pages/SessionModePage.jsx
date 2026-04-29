@@ -30,7 +30,16 @@ function parsePowerInfo(text) {
 // ── Always-15-box damage track ────────────────────────────────────────────────
 const TOTAL_BOXES = 15;
 
-function DamageTrack({ active, superficial, aggravated }) {
+// Build an array of box states [0=empty,1=sup,2=agg] from counts
+function buildCardTrack(maxVal, sup, agg) {
+  return Array.from({ length: maxVal }, (_, i) => {
+    const fromRight = maxVal - 1 - i;
+    return fromRight < agg ? 2 : fromRight < agg + sup ? 1 : 0;
+  });
+}
+
+// track: optional array of 0/1/2 (edit mode). onBoxClick: cycle on click.
+function DamageTrack({ active, superficial, aggravated, track, onBoxClick }) {
   return (
     <div className="flex gap-1 flex-wrap">
       {Array.from({ length: TOTAL_BOXES }, (_, i) => {
@@ -39,16 +48,19 @@ function DamageTrack({ active, superficial, aggravated }) {
             <div key={i} className="w-6 h-6 border border-gray-900 rounded-sm bg-gray-950 opacity-20" />
           );
         }
-        const fromRight = active - 1 - i;
-        const state =
-          fromRight < aggravated               ? 2 :
-          fromRight < aggravated + superficial  ? 1 : 0;
+        const state = track != null
+          ? (track[i] ?? 0)
+          : (() => { const fr = active - 1 - i; return fr < aggravated ? 2 : fr < aggravated + superficial ? 1 : 0; })();
         const cls =
           state === 2 ? "border-blood bg-blood-dark/50 text-blood" :
           state === 1 ? "border-yellow-600 bg-yellow-900/30 text-yellow-500" :
                         "border-gray-700 text-transparent";
         return (
-          <div key={i} className={`w-6 h-6 border rounded-sm flex items-center justify-center text-xs font-bold ${cls}`}>
+          <div
+            key={i}
+            onClick={onBoxClick ? () => onBoxClick(i) : undefined}
+            className={`w-6 h-6 border rounded-sm flex items-center justify-center text-xs font-bold ${cls} ${onBoxClick ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
+          >
             {state === 1 ? "/" : state === 2 ? "×" : "·"}
           </div>
         );
@@ -175,39 +187,52 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
   const [saving, setSaving] = useState(false);
 
   const [ls, setLs] = useState({
-    blood_potency:        char.blood_potency,
-    humanity:             char.humanity,
-    current_hunger:       char.current_hunger ?? 0,
-    health:               char.health,
-    willpower:            char.willpower,
-    health_superficial:   char.health_superficial,
-    health_aggravated:    char.health_aggravated,
-    willpower_superficial: char.willpower_superficial,
-    willpower_aggravated:  char.willpower_aggravated,
+    blood_potency:  char.blood_potency,
+    humanity:       char.humanity,
+    current_hunger: char.current_hunger ?? 0,
+    health:         char.health,
+    willpower:      char.willpower,
   });
+  const [healthTrack, setHealthTrack] = useState(() =>
+    buildCardTrack(char.health, char.health_superficial, char.health_aggravated));
+  const [wpTrack, setWpTrack] = useState(() =>
+    buildCardTrack(char.willpower, char.willpower_superficial, char.willpower_aggravated));
 
-  // Re-sync from server after each save (char prop changes)
+  // Re-sync when server pushes new values
   useEffect(() => {
-    setLs({
-      blood_potency:        char.blood_potency,
-      humanity:             char.humanity,
-      current_hunger:       char.current_hunger ?? 0,
-      health:               char.health,
-      willpower:            char.willpower,
-      health_superficial:   char.health_superficial,
-      health_aggravated:    char.health_aggravated,
-      willpower_superficial: char.willpower_superficial,
-      willpower_aggravated:  char.willpower_aggravated,
-    });
+    setLs({ blood_potency: char.blood_potency, humanity: char.humanity,
+            current_hunger: char.current_hunger ?? 0, health: char.health, willpower: char.willpower });
+    setHealthTrack(buildCardTrack(char.health, char.health_superficial, char.health_aggravated));
+    setWpTrack(buildCardTrack(char.willpower, char.willpower_superficial, char.willpower_aggravated));
   }, [char.blood_potency, char.humanity, char.current_hunger, char.health, char.willpower,
       char.health_superficial, char.health_aggravated, char.willpower_superficial, char.willpower_aggravated]);
 
   const set = (key, val) => setLs(s => ({ ...s, [key]: val }));
 
+  // Resize track when max changes — add empty boxes or trim
+  const changeMax = (key, newMax, track, setTrack, clampMax) => {
+    set(key, Math.max(1, Math.min(clampMax, newMax)));
+    setTrack(prev =>
+      newMax > prev.length
+        ? [...prev, ...Array(newMax - prev.length).fill(0)]
+        : prev.slice(0, newMax)
+    );
+  };
+
+  const cycleBox = (setTrack, i) =>
+    setTrack(prev => prev.map((s, idx) => idx === i ? (s + 1) % 3 : s));
+
   const handleSave = async () => {
     setSaving(true);
-    try { await onSaveCard(char.id, ls); }
-    finally { setSaving(false); }
+    try {
+      await onSaveCard(char.id, {
+        ...ls,
+        health_superficial:    healthTrack.filter(s => s === 1).length,
+        health_aggravated:     healthTrack.filter(s => s === 2).length,
+        willpower_superficial: wpTrack.filter(s => s === 1).length,
+        willpower_aggravated:  wpTrack.filter(s => s === 2).length,
+      });
+    } finally { setSaving(false); }
   };
 
   // Small +/− button used inside the card edit controls
@@ -289,18 +314,18 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       {/* Health + Willpower */}
       <div className="flex flex-col gap-2">
         {[
-          { label: "Health",    key: "health",    supKey: "health_superficial",    aggKey: "health_aggravated",    max: 15 },
-          { label: "Willpower", key: "willpower", supKey: "willpower_superficial", aggKey: "willpower_aggravated", max: 10 },
-        ].map(({ label, key, supKey, aggKey, max }) => (
+          { label: "Health",    key: "health",    track: healthTrack, setTrack: setHealthTrack, clampMax: 15 },
+          { label: "Willpower", key: "willpower", track: wpTrack,     setTrack: setWpTrack,     clampMax: 10 },
+        ].map(({ label, key, track, setTrack, clampMax }) => (
           <div key={key}>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs text-gray-600">{label}</p>
                 {fullEditMode && isGM ? (
                   <div className="flex items-center gap-1">
-                    <Btn onClick={() => set(key, Math.max(1, ls[key] - 1))}>−</Btn>
+                    <Btn onClick={() => changeMax(key, ls[key] - 1, track, setTrack, clampMax)}>−</Btn>
                     <span className="text-xs text-gray-400 w-4 text-center">{ls[key]}</span>
-                    <Btn onClick={() => set(key, Math.min(max, ls[key] + 1))}>+</Btn>
+                    <Btn onClick={() => changeMax(key, ls[key] + 1, track, setTrack, clampMax)}>+</Btn>
                   </div>
                 ) : (
                   <span className="text-gray-700 text-xs">({char[key]} active)</span>
@@ -312,23 +337,13 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
                 <span className="text-blood">× agg</span>
               </p>
             </div>
-            <DamageTrack active={ls[key]} superficial={ls[supKey]} aggravated={ls[aggKey]} />
-            {fullEditMode && isGM && (
-              <div className="flex gap-4 mt-1.5">
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-yellow-600 w-8">/ Sup</span>
-                  <Btn onClick={() => set(supKey, Math.max(0, ls[supKey] - 1))}>−</Btn>
-                  <span className="text-xs text-yellow-600 w-4 text-center">{ls[supKey]}</span>
-                  <Btn onClick={() => set(supKey, Math.min(ls[key] - ls[aggKey], ls[supKey] + 1))}>+</Btn>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-blood w-8">× Agg</span>
-                  <Btn onClick={() => set(aggKey, Math.max(0, ls[aggKey] - 1))}>−</Btn>
-                  <span className="text-xs text-blood w-4 text-center">{ls[aggKey]}</span>
-                  <Btn onClick={() => set(aggKey, Math.min(ls[key] - ls[supKey], ls[aggKey] + 1))}>+</Btn>
-                </div>
-              </div>
-            )}
+            <DamageTrack
+              active={ls[key]}
+              superficial={char[key === "health" ? "health_superficial" : "willpower_superficial"]}
+              aggravated={char[key === "health" ? "health_aggravated" : "willpower_aggravated"]}
+              track={fullEditMode && isGM ? track : undefined}
+              onBoxClick={fullEditMode && isGM ? (i) => cycleBox(setTrack, i) : undefined}
+            />
           </div>
         ))}
       </div>
@@ -529,21 +544,9 @@ export default function SessionModePage() {
     }
   }, [groupId, fetchConditions]);
 
-  const handleSaveCard = useCallback(async (charId, ls) => {
+  const handleSaveCard = useCallback(async (charId, stats) => {
     try {
-      await api.put(`/api/characters/${charId}/gm-adjust`, {
-        blood_potency: ls.blood_potency,
-        humanity:      ls.humanity,
-        health:        ls.health,
-        willpower:     ls.willpower,
-      });
-      await api.put(`/api/characters/${charId}/session`, {
-        current_hunger:        ls.current_hunger,
-        health_superficial:    ls.health_superficial,
-        health_aggravated:     ls.health_aggravated,
-        willpower_superficial: ls.willpower_superficial,
-        willpower_aggravated:  ls.willpower_aggravated,
-      });
+      await api.put(`/api/characters/${charId}/gm-adjust`, stats);
       refresh();
     } catch (_) {}
   }, [refresh]);
