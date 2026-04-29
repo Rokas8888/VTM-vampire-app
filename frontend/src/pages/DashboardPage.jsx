@@ -167,6 +167,18 @@ export default function DashboardPage() {
     if (charId) openCharacter(Number(charId));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Poll open character every 10s so GM edits appear live ────────────────
+  useEffect(() => {
+    if (!selected) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/api/characters/${selected.id}`);
+        setSelected(res.data);
+      } catch {}
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load character list + groups ──────────────────────────────────────────
   useEffect(() => {
     api.get("/api/characters/mine")

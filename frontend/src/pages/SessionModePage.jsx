@@ -165,14 +165,19 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit, fullEditMode }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
 
   return (
     <div
-      className="border border-void-border hover:border-blood/40 rounded-lg p-4 flex flex-col gap-4 transition-colors"
+      onClick={fullEditMode && onFullEdit ? () => onFullEdit(char.id) : undefined}
+      className={`border rounded-lg p-4 flex flex-col gap-4 transition-colors ${
+        fullEditMode
+          ? "border-blood/60 cursor-pointer hover:border-blood hover:bg-blood-dark/10"
+          : "border-void-border hover:border-blood/40"
+      }`}
       style={clanCardStyle(char.clan_name)}
     >
 
@@ -330,18 +335,6 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
       )}
 
-      {/* GM full-edit button */}
-      {isGM && onFullEdit && (
-        <div className="border-t border-void-border/40 pt-3">
-          <button
-            onClick={(e) => { e.stopPropagation(); onFullEdit(char.id); }}
-            className="w-full text-xs font-gothic tracking-wider text-gray-600 hover:text-blood border border-void-border/40 hover:border-blood/40 rounded py-1.5 transition-colors"
-          >
-            ✎ Full Edit
-          </button>
-        </div>
-      )}
-
       {/* Retainers dropdown */}
       {char.retainers?.length > 0 && (
         <div className="border-t border-void-border/40 pt-3">
@@ -381,15 +374,22 @@ export default function SessionModePage() {
   // lastRollMap: username → most recent RollOut for that player
   const [lastRollMap, setLastRollMap] = useState({});
 
-  // Full edit save flash
-  const [savedFlash, setSavedFlash] = useState(false);
-  const savedTimer = useRef(null);
+  // Full edit save indicator
+  const [hasChanges, setHasChanges] = useState(false);
+  const [gmStatSaving, setGmStatSaving] = useState(false);
 
-  const flashSaved = () => {
-    setSavedFlash(true);
-    clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setSavedFlash(false), 2000);
-  };
+  const flashSaved = () => setHasChanges(true);
+
+  const adjustGmStat = useCallback(async (key, value) => {
+    if (!editChar) return;
+    setGmStatSaving(true);
+    try {
+      const res = await api.put(`/api/characters/${editChar.id}/gm-adjust`, { [key]: value });
+      setEditChar(res.data);
+      flashSaved();
+    } catch (_) {}
+    finally { setGmStatSaving(false); }
+  }, [editChar]);
 
   // retainer modal
   const [retainerModal, setRetainerModal]     = useState(null); // full character object
@@ -398,10 +398,12 @@ export default function SessionModePage() {
   // full-edit overlay (GM only)
   const [editChar, setEditChar]         = useState(null);
   const [loadingEdit, setLoadingEdit]   = useState(false);
+  const [fullEditMode, setFullEditMode] = useState(false);
 
   const openFullEdit = useCallback(async (charId) => {
     setLoadingEdit(true);
     setEditChar(null);
+    setHasChanges(false);
     editCharRef.current = charId;
     try {
       const res = await api.get(`/api/characters/${charId}`);
@@ -412,8 +414,9 @@ export default function SessionModePage() {
 
   const closeFullEdit = () => {
     setEditChar(null);
+    setHasChanges(false);
     editCharRef.current = null;
-    refresh(); // immediately sync session cards
+    refresh();
   };
 
   const openRetainer = useCallback(async (id) => {
@@ -530,6 +533,18 @@ export default function SessionModePage() {
               ? `Synced ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
               : "Connecting…"}
           </span>
+          {isGM && (
+            <button
+              onClick={() => setFullEditMode((v) => !v)}
+              className={`text-xs font-gothic tracking-wider border rounded px-3 py-1 transition-colors ${
+                fullEditMode
+                  ? "border-blood text-blood bg-blood-dark/20"
+                  : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+              }`}
+            >
+              {fullEditMode ? "✓ Full Edit" : "Full Edit"}
+            </button>
+          )}
           <button onClick={() => navigate("/gm")}
             className="text-gray-600 hover:text-gray-300 text-xs font-gothic tracking-wider transition-colors">
             ← Dashboard
@@ -539,6 +554,20 @@ export default function SessionModePage() {
 
       {error && (
         <div className="bg-blood-dark/20 border border-blood-dark rounded p-3 mb-4 text-red-300 text-sm">{error}</div>
+      )}
+
+      {fullEditMode && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blood-dark/20 border border-blood-dark/60 rounded mb-4 gap-3">
+          <span className="text-sm font-gothic text-blood">
+            ⚑ Full Edit — click any character card to edit
+          </span>
+          <button
+            onClick={() => setFullEditMode(false)}
+            className="text-xs font-gothic text-blood-dark hover:text-blood border border-blood-dark hover:border-blood rounded px-2 py-0.5 transition-colors shrink-0"
+          >
+            Exit
+          </button>
+        </div>
       )}
 
       {!group && !error && (
@@ -559,6 +588,7 @@ export default function SessionModePage() {
               onConditionsChange={() => refreshConditionsFor(char.id)}
               lastRoll={lastRollMap[player] ?? null}
               onOpenRetainer={openRetainer}
+              fullEditMode={fullEditMode}
               onFullEdit={isGM ? openFullEdit : undefined}
             />
           ))}
@@ -575,20 +605,22 @@ export default function SessionModePage() {
       {(editChar || loadingEdit) && (
         <div className="fixed inset-0 bg-black/85 z-50 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-6 py-3 border-b border-void-border bg-void-light shrink-0">
-            <span className="font-gothic text-blood text-lg">
-              {loadingEdit ? "Opening…" : editChar?.name}
-            </span>
             <div className="flex items-center gap-3">
-              {savedFlash && (
-                <span className="text-xs text-green-500 font-gothic tracking-wider transition-opacity">
-                  ✓ Saved
+              <span className="font-gothic text-blood text-lg">
+                {loadingEdit ? "Opening…" : editChar?.name}
+              </span>
+              {!loadingEdit && (
+                <span className="text-xs font-gothic tracking-widest text-blood border border-blood-dark rounded px-2 py-0.5 uppercase">
+                  Full Edit
                 </span>
               )}
+            </div>
+            <div className="flex items-center gap-3">
               <button
                 onClick={closeFullEdit}
-                className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
+                className="text-sm font-gothic tracking-wider bg-green-900/40 hover:bg-green-800/60 border border-green-700 text-green-400 rounded px-4 py-1.5 transition-colors"
               >
-                ✕ Close
+                ✓ Save & Close
               </button>
             </div>
           </div>
@@ -596,6 +628,36 @@ export default function SessionModePage() {
             {loadingEdit ? (
               <p className="font-gothic text-blood animate-pulse text-center mt-20">Opening the coffin…</p>
             ) : editChar ? (
+              <>
+              {/* GM Quick Stats — permanent stat overrides */}
+              <div className="mb-6 border border-blood-dark/60 rounded-lg p-4 bg-blood-dark/10">
+                <p className="text-xs text-blood font-gothic tracking-widest uppercase mb-3">GM Quick Stats</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { label: "HP Max",      key: "health",        min: 1,  max: 15, value: editChar.health },
+                    { label: "WP Max",      key: "willpower",     min: 1,  max: 10, value: editChar.willpower },
+                    { label: "Blood Pot.",  key: "blood_potency", min: 0,  max: 5,  value: editChar.blood_potency },
+                    { label: "Humanity",    key: "humanity",      min: 0,  max: 10, value: editChar.humanity },
+                  ].map(({ label, key, min, max, value }) => (
+                    <div key={key} className="flex flex-col items-center gap-1">
+                      <span className="text-xs text-gray-500 font-gothic">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => adjustGmStat(key, Math.max(min, value - 1))}
+                          disabled={value <= min || gmStatSaving}
+                          className="w-7 h-7 rounded border border-void-border text-gray-400 hover:border-blood hover:text-blood disabled:opacity-30 transition-colors text-base leading-none"
+                        >−</button>
+                        <span className="text-gray-200 font-gothic text-lg w-6 text-center">{value}</span>
+                        <button
+                          onClick={() => adjustGmStat(key, Math.min(max, value + 1))}
+                          disabled={value >= max || gmStatSaving}
+                          className="w-7 h-7 rounded border border-void-border text-gray-400 hover:border-blood hover:text-blood disabled:opacity-30 transition-colors text-base leading-none"
+                        >+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <CharacterSheet
                 character={editChar}
                 freeEdit
@@ -616,6 +678,7 @@ export default function SessionModePage() {
                 onDeleteSpecialty={async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${editChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setEditChar(res.data); flashSaved(); }}
                 onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${editChar.id}/claim-predator-power`, { power_id: powerId }); setEditChar(res.data); flashSaved(); } catch {} }}
               />
+              </>
             ) : null}
           </div>
         </div>

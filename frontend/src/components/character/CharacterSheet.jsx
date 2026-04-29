@@ -953,6 +953,15 @@ export default function CharacterSheet({
     setBeliefError(null);
   }, [character.id]);
 
+  // Re-sync tracks when max health/willpower changes (e.g. GM adjusts via gm-adjust or Stamina improve)
+  useEffect(() => {
+    setHealthTrack(buildTrack(character.health, character.health_superficial, character.health_aggravated));
+  }, [character.health]);
+
+  useEffect(() => {
+    setWpTrack(buildTrack(character.willpower, character.willpower_superficial, character.willpower_aggravated));
+  }, [character.willpower]);
+
   // Load game data lists when the add-advantage panel opens
   useEffect(() => {
     if (!showAddAdvantage) return;

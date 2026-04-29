@@ -435,6 +435,10 @@ def gm_adjust_stats(
         char.humanity = max(0, min(10, body.humanity))
     if body.blood_potency is not None:
         char.blood_potency = max(0, min(5, body.blood_potency))
+    if body.health is not None:
+        char.health = max(1, min(15, body.health))
+    if body.willpower is not None:
+        char.willpower = max(1, min(10, body.willpower))
 
     db.commit()
     return load_full_character(char.id, db)

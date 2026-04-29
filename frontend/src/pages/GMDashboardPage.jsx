@@ -492,6 +492,7 @@ export default function GMDashboardPage() {
   const [viewChar, setViewChar]           = useState(null);
   const [loadingChar, setLoadingChar]     = useState(false);
   const [manageMode, setManageMode]       = useState(false);
+  const [gmHasChanges, setGmHasChanges]   = useState(false);
 
   // Dice roller
   const [showDice, setShowDice] = useState(false);
@@ -621,6 +622,7 @@ export default function GMDashboardPage() {
   const openCharacter = (charId) => {
     setLoadingChar(true);
     setManageMode(false);
+    setGmHasChanges(false);
     api.get(`/api/characters/${charId}`)
       .then((res) => { setViewChar(res.data); setLoadingChar(false); })
       .catch(() => setLoadingChar(false));
@@ -632,6 +634,7 @@ export default function GMDashboardPage() {
       trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true,
     });
     setViewChar(res.data);
+    setGmHasChanges(true);
   };
 
   const gmUnimprove = async (traitType, traitName, extra = {}) => {
@@ -639,6 +642,7 @@ export default function GMDashboardPage() {
       trait_type: traitType, trait_name: traitName || undefined, ...extra,
     });
     setViewChar(res.data);
+    setGmHasChanges(true);
   };
 
   // ── Flatten all characters + retainers for grid ──────────────────────────
@@ -1018,10 +1022,10 @@ export default function GMDashboardPage() {
                 </button>
               )}
               <button
-                onClick={() => { setViewChar(null); setManageMode(false); }}
-                className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
+                onClick={() => { setViewChar(null); setManageMode(false); setGmHasChanges(false); }}
+                className="text-sm font-gothic tracking-wider bg-green-900/40 hover:bg-green-800/60 border border-green-700 text-green-400 rounded px-4 py-1.5 transition-colors"
               >
-                ✕ Close
+                ✓ Save & Close
               </button>
             </div>
           </div>
@@ -1042,14 +1046,14 @@ export default function GMDashboardPage() {
                   freeEdit={manageMode}
                   onImprove={manageMode ? gmImprove : undefined}
                   onUnimprove={manageMode ? gmUnimprove : undefined}
-                  onCharacterUpdate={(updated) => setViewChar(updated)}
-                  onAddWeapon={manageMode ? async (w) => { const res = await api.post(`/api/characters/${viewChar.id}/weapons`, w); setViewChar(res.data); } : undefined}
-                  onDeleteWeapon={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/weapons/${id}`); setViewChar(res.data); } : undefined}
-                  onAddPossession={manageMode ? async (p) => { const res = await api.post(`/api/characters/${viewChar.id}/possessions`, p); setViewChar(res.data); } : undefined}
-                  onDeletePossession={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/possessions/${id}`); setViewChar(res.data); } : undefined}
-                  onAddSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${viewChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setViewChar(res.data); } : undefined}
-                  onDeleteSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${viewChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setViewChar(res.data); } : undefined}
-                  onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${viewChar.id}/claim-predator-power`, { power_id: powerId }); setViewChar(res.data); } catch {} }}
+                  onCharacterUpdate={(updated) => { setViewChar(updated); setGmHasChanges(true); }}
+                  onAddWeapon={manageMode ? async (w) => { const res = await api.post(`/api/characters/${viewChar.id}/weapons`, w); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onDeleteWeapon={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/weapons/${id}`); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onAddPossession={manageMode ? async (p) => { const res = await api.post(`/api/characters/${viewChar.id}/possessions`, p); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onDeletePossession={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/possessions/${id}`); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onAddSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${viewChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onDeleteSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${viewChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setViewChar(res.data); setGmHasChanges(true); } : undefined}
+                  onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${viewChar.id}/claim-predator-power`, { power_id: powerId }); setViewChar(res.data); setGmHasChanges(true); } catch {} }}
                 />
                 <div className="max-w-2xl mx-auto mt-6 border-t border-void-border pt-6">
                   <ConditionManager
