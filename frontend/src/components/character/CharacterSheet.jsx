@@ -84,37 +84,38 @@ function DotTracker({ value, max, onChange, variant = "blood" }) {
 }
 
 // ── Humanity tracker with 3 dot states ───────────────────────────────────────
-// Full (red) → Stained (smaller, dim red) → Empty (grey)
-// Clicking a full dot → marks it as a stain (pending remorse check)
-// Clicking a stained dot → restores it to full
-// Clicking an empty dot → restore if stains exist, otherwise set value
-function HumanityTracker({ value, stains, onChangeHumanity, onChangeStains }) {
+// Full (red) = permanent humanity dot — GM only: click to remove permanently
+// Stained (small dim) = pending remorse check — not clickable here
+// Empty (grey) = GM clicks to add permanent dot; player clicks to mark a stain
+function HumanityTracker({ value, stains, onChangeHumanity, onChangeStains, freeEdit = false }) {
   return (
     <div className="flex gap-1 flex-wrap justify-center">
       {Array.from({ length: 10 }, (_, i) => {
-        const pos      = i + 1;
-        const isFull   = pos <= value;
-        const isStain  = pos > value && pos <= value + stains;
+        const pos     = i + 1;
+        const isFull  = pos <= value;
+        const isStain = pos > value && pos <= value + stains;
         return (
           <button
             key={i}
-            title={isFull ? "Mark as stain (remorse required)" : isStain ? "Remove stain" : "Restore dot"}
+            title={
+              isFull   ? (freeEdit ? "GM: remove humanity dot" : "") :
+              isStain  ? "Stain — remorse roll pending" :
+              freeEdit ? "GM: add humanity dot" : "Mark stain"
+            }
             onClick={() => {
               if (isFull) {
-                // last filled dot becomes a stain
+                // GM only — permanently remove a humanity dot
+                if (!freeEdit) return;
                 onChangeHumanity(value - 1);
-                onChangeStains(stains + 1);
               } else if (isStain) {
-                // un-stain (restore)
-                onChangeHumanity(value + 1);
-                onChangeStains(stains - 1);
+                // stain dots are not directly clickable — cleared via remorse roll
+                return;
               } else {
-                // empty: restore from stain pool if possible, else set directly
-                if (stains > 0) {
+                // empty slot: GM adds a permanent dot; player marks a stain
+                if (freeEdit) {
                   onChangeHumanity(value + 1);
-                  onChangeStains(stains - 1);
                 } else {
-                  onChangeHumanity(pos);
+                  onChangeStains(stains + 1);
                 }
               }
             }}
@@ -1316,6 +1317,7 @@ export default function CharacterSheet({
               stains={stains}
               onChangeHumanity={setHum}
               onChangeStains={setStn}
+              freeEdit={freeEdit}
             />
             {stains > 0 && (
               <p className="text-gray-600 text-xs mt-2">Remorse roll required at End Session</p>
