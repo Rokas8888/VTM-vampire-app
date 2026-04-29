@@ -488,9 +488,10 @@ export default function GMDashboardPage() {
   // Add player error (lifted from AddPlayerPanel)
   const [addPlayerError, setAddPlayerError] = useState(null);
 
-  // Full character sheet view (read-only)
+  // Full character sheet view
   const [viewChar, setViewChar]           = useState(null);
   const [loadingChar, setLoadingChar]     = useState(false);
+  const [manageMode, setManageMode]       = useState(false);
 
   // Dice roller
   const [showDice, setShowDice] = useState(false);
@@ -619,9 +620,25 @@ export default function GMDashboardPage() {
   // ── Open character sheet ───────────────────────────────────────────────────
   const openCharacter = (charId) => {
     setLoadingChar(true);
+    setManageMode(false);
     api.get(`/api/characters/${charId}`)
       .then((res) => { setViewChar(res.data); setLoadingChar(false); })
       .catch(() => setLoadingChar(false));
+  };
+
+  // ── GM manage handlers ────────────────────────────────────────────────────
+  const gmImprove = async (traitType, traitName, extra = {}) => {
+    const res = await api.post(`/api/characters/${viewChar.id}/improve`, {
+      trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true,
+    });
+    setViewChar(res.data);
+  };
+
+  const gmUnimprove = async (traitType, traitName, extra = {}) => {
+    const res = await api.post(`/api/characters/${viewChar.id}/unimprove`, {
+      trait_type: traitType, trait_name: traitName || undefined, ...extra,
+    });
+    setViewChar(res.data);
   };
 
   // ── Flatten all characters + retainers for grid ──────────────────────────
@@ -980,26 +997,60 @@ export default function GMDashboardPage() {
         </div>
       </div>
 
-      {/* ── Read-only character sheet overlay ── */}
+      {/* ── Character sheet overlay ── */}
       {(viewChar || loadingChar) && (
         <div className="fixed inset-0 bg-black/80 z-40 flex flex-col overflow-hidden">
           <div className="flex justify-between items-center px-6 py-3 border-b border-void-border bg-void-light shrink-0">
             <span className="font-gothic text-blood text-lg">
               {loadingChar ? "Opening the coffin…" : viewChar?.name}
             </span>
-            <button
-              onClick={() => setViewChar(null)}
-              className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
-            >
-              ✕ Close
-            </button>
+            <div className="flex items-center gap-3">
+              {!loadingChar && (
+                <button
+                  onClick={() => setManageMode((v) => !v)}
+                  className={`text-xs font-gothic tracking-wider border rounded px-3 py-1.5 transition-colors ${
+                    manageMode
+                      ? "border-blood text-blood bg-blood-dark/20"
+                      : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                  }`}
+                >
+                  {manageMode ? "✓ Managing" : "Manage"}
+                </button>
+              )}
+              <button
+                onClick={() => { setViewChar(null); setManageMode(false); }}
+                className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
+          {manageMode && (
+            <div className="px-6 py-2 bg-blood-dark/10 border-b border-blood-dark/30 shrink-0">
+              <p className="text-xs text-blood/70 font-gothic tracking-wider">
+                Manage mode — full edit access. Changes apply immediately with no XP cost.
+              </p>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-6">
             {loadingChar ? (
               <Spinner text="Opening the coffin…" />
             ) : (
               <>
-                <CharacterSheet character={viewChar} />
+                <CharacterSheet
+                  character={viewChar}
+                  freeEdit={manageMode}
+                  onImprove={manageMode ? gmImprove : undefined}
+                  onUnimprove={manageMode ? gmUnimprove : undefined}
+                  onCharacterUpdate={(updated) => setViewChar(updated)}
+                  onAddWeapon={manageMode ? async (w) => { const res = await api.post(`/api/characters/${viewChar.id}/weapons`, w); setViewChar(res.data); } : undefined}
+                  onDeleteWeapon={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/weapons/${id}`); setViewChar(res.data); } : undefined}
+                  onAddPossession={manageMode ? async (p) => { const res = await api.post(`/api/characters/${viewChar.id}/possessions`, p); setViewChar(res.data); } : undefined}
+                  onDeletePossession={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/possessions/${id}`); setViewChar(res.data); } : undefined}
+                  onAddSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${viewChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setViewChar(res.data); } : undefined}
+                  onDeleteSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${viewChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setViewChar(res.data); } : undefined}
+                  onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${viewChar.id}/claim-predator-power`, { power_id: powerId }); setViewChar(res.data); } catch {} }}
+                />
                 <div className="max-w-2xl mx-auto mt-6 border-t border-void-border pt-6">
                   <ConditionManager
                     characterId={viewChar?.id}

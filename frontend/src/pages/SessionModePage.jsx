@@ -166,7 +166,7 @@ const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
 function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer,
-  manageMode, isActive, onActivate, statOverrides, onStatChange }) {
+  manageMode, isActive, onActivate, statOverrides, onStatChange, onFullEdit }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
@@ -356,6 +356,18 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
       )}
 
+      {/* GM full-edit button */}
+      {isGM && onFullEdit && (
+        <div className="border-t border-void-border/40 pt-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); onFullEdit(char.id); }}
+            className="w-full text-xs font-gothic tracking-wider text-gray-600 hover:text-blood border border-void-border/40 hover:border-blood/40 rounded py-1.5 transition-colors"
+          >
+            ✎ Full Edit
+          </button>
+        </div>
+      )}
+
       {/* Retainers dropdown */}
       {char.retainers?.length > 0 && (
         <div className="border-t border-void-border/40 pt-3">
@@ -395,16 +407,40 @@ export default function SessionModePage() {
   // lastRollMap: username → most recent RollOut for that player
   const [lastRollMap, setLastRollMap] = useState({});
 
-  // GM manage mode
-  const [manageMode, setManageMode]               = useState(null); // "humanity" | "blood_potency" | null
-  const [activeCard, setActiveCard]               = useState(null); // charId | null
-  const [statOverrides, setStatOverrides]         = useState({});   // { [charId]: { humanity?: number, blood_potency?: number } }
-  const [showManageDropdown, setShowManageDropdown] = useState(false);
-  const manageRef = useRef(null);
+  // Full edit save flash
+  const [savedFlash, setSavedFlash] = useState(false);
+  const savedTimer = useRef(null);
+
+  const flashSaved = () => {
+    setSavedFlash(true);
+    clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSavedFlash(false), 2000);
+  };
 
   // retainer modal
   const [retainerModal, setRetainerModal]     = useState(null); // full character object
   const [loadingRetainer, setLoadingRetainer] = useState(false);
+
+  // full-edit overlay (GM only)
+  const [editChar, setEditChar]         = useState(null);
+  const [loadingEdit, setLoadingEdit]   = useState(false);
+
+  const openFullEdit = useCallback(async (charId) => {
+    setLoadingEdit(true);
+    setEditChar(null);
+    editCharRef.current = charId;
+    try {
+      const res = await api.get(`/api/characters/${charId}`);
+      setEditChar(res.data);
+    } catch (_) {}
+    finally { setLoadingEdit(false); }
+  }, []);
+
+  const closeFullEdit = () => {
+    setEditChar(null);
+    editCharRef.current = null;
+    refresh(); // immediately sync session cards
+  };
 
   const openRetainer = useCallback(async (id) => {
     setLoadingRetainer(true);
@@ -423,17 +459,6 @@ export default function SessionModePage() {
     }).catch(() => {});
   }, []);
 
-  // Close manage dropdown on outside click
-  useEffect(() => {
-    if (!showManageDropdown) return;
-    const close = (e) => {
-      if (manageRef.current && !manageRef.current.contains(e.target)) {
-        setShowManageDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [showManageDropdown]);
 
   const fetchConditions = useCallback(async (charIds) => {
     const results = await Promise.allSettled(
@@ -465,6 +490,8 @@ export default function SessionModePage() {
     }
   }, [groupId]);
 
+  const editCharRef = useRef(null);
+
   const refresh = useCallback(async () => {
     try {
       const res = await api.get(`/api/groups/${groupId}`);
@@ -473,6 +500,11 @@ export default function SessionModePage() {
       setError(null);
       const ids = res.data.members.flatMap((m) => m.characters.map((c) => c.id));
       if (ids.length) fetchConditions(ids);
+      // If Full Edit overlay is open, also refresh that character
+      if (editCharRef.current) {
+        const charRes = await api.get(`/api/characters/${editCharRef.current}`);
+        setEditChar(charRes.data);
+      }
     } catch (e) {
       setError(e.response?.data?.detail ?? "Failed to load group.");
     }
@@ -495,26 +527,6 @@ export default function SessionModePage() {
     }).catch(() => {});
   }, []);
 
-  const handleStatChange = async (charId, stat, delta) => {
-    const card    = cards.find((c) => c.char.id === charId);
-    const current = statOverrides[charId]?.[stat] ?? card?.char[stat] ?? 0;
-    const max     = stat === "humanity" ? 10 : 5;
-    const newVal  = Math.max(0, Math.min(max, current + delta));
-
-    setStatOverrides((prev) => ({
-      ...prev,
-      [charId]: { ...prev[charId], [stat]: newVal },
-    }));
-
-    try {
-      await api.put(`/api/characters/${charId}/gm-adjust`, { [stat]: newVal });
-    } catch {
-      setStatOverrides((prev) => ({
-        ...prev,
-        [charId]: { ...prev[charId], [stat]: current },
-      }));
-    }
-  };
 
   const cards = group
     ? group.members.flatMap((m) => m.characters.map((c) => ({ char: c, player: m.username })))
@@ -624,6 +636,7 @@ export default function SessionModePage() {
               onActivate={() => setActiveCard(char.id)}
               statOverrides={statOverrides[char.id] ?? {}}
               onStatChange={(stat, delta) => handleStatChange(char.id, stat, delta)}
+              onFullEdit={isGM ? openFullEdit : undefined}
             />
           ))}
         </div>
@@ -632,6 +645,54 @@ export default function SessionModePage() {
       {group && cards.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-gray-600 font-gothic text-xl">No characters in this group yet.</p>
+        </div>
+      )}
+
+      {/* ── Full-edit overlay (GM) ── */}
+      {(editChar || loadingEdit) && (
+        <div className="fixed inset-0 bg-black/85 z-50 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-void-border bg-void-light shrink-0">
+            <span className="font-gothic text-blood text-lg">
+              {loadingEdit ? "Opening…" : editChar?.name}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-blood/60 font-gothic tracking-wider border border-blood-dark/40 rounded px-2 py-0.5">
+                Full Edit — no XP cost
+              </span>
+              <button
+                onClick={() => setEditChar(null)}
+                className="text-gray-500 hover:text-blood transition-colors font-gothic tracking-wider text-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 bg-void">
+            {loadingEdit ? (
+              <p className="font-gothic text-blood animate-pulse text-center mt-20">Opening the coffin…</p>
+            ) : editChar ? (
+              <CharacterSheet
+                character={editChar}
+                freeEdit
+                onImprove={async (traitType, traitName, extra = {}) => {
+                  const res = await api.post(`/api/characters/${editChar.id}/improve`, { trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true });
+                  setEditChar(res.data);
+                }}
+                onUnimprove={async (traitType, traitName, extra = {}) => {
+                  const res = await api.post(`/api/characters/${editChar.id}/unimprove`, { trait_type: traitType, trait_name: traitName || undefined, ...extra });
+                  setEditChar(res.data);
+                }}
+                onCharacterUpdate={(updated) => setEditChar(updated)}
+                onAddWeapon={async (w) => { const res = await api.post(`/api/characters/${editChar.id}/weapons`, w); setEditChar(res.data); }}
+                onDeleteWeapon={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/weapons/${id}`); setEditChar(res.data); }}
+                onAddPossession={async (p) => { const res = await api.post(`/api/characters/${editChar.id}/possessions`, p); setEditChar(res.data); }}
+                onDeletePossession={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/possessions/${id}`); setEditChar(res.data); }}
+                onAddSpecialty={async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${editChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setEditChar(res.data); }}
+                onDeleteSpecialty={async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${editChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setEditChar(res.data); }}
+                onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${editChar.id}/claim-predator-power`, { power_id: powerId }); setEditChar(res.data); } catch {} }}
+              />
+            ) : null}
+          </div>
         </div>
       )}
 
