@@ -1,8 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import ConditionManager from "../components/gm/ConditionManager";
-import CharacterSheet from "../components/character/CharacterSheet";
 import { clanCardStyle } from "../utils/clanImages";
 
 function getRollHint(text) {
@@ -169,18 +168,61 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit, fullEditMode, onGmAdjust, onSessionAdjust }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, fullEditMode, onSaveCard }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [ls, setLs] = useState({
+    blood_potency:        char.blood_potency,
+    humanity:             char.humanity,
+    current_hunger:       char.current_hunger ?? 0,
+    health:               char.health,
+    willpower:            char.willpower,
+    health_superficial:   char.health_superficial,
+    health_aggravated:    char.health_aggravated,
+    willpower_superficial: char.willpower_superficial,
+    willpower_aggravated:  char.willpower_aggravated,
+  });
+
+  // Re-sync from server after each save (char prop changes)
+  useEffect(() => {
+    setLs({
+      blood_potency:        char.blood_potency,
+      humanity:             char.humanity,
+      current_hunger:       char.current_hunger ?? 0,
+      health:               char.health,
+      willpower:            char.willpower,
+      health_superficial:   char.health_superficial,
+      health_aggravated:    char.health_aggravated,
+      willpower_superficial: char.willpower_superficial,
+      willpower_aggravated:  char.willpower_aggravated,
+    });
+  }, [char.blood_potency, char.humanity, char.current_hunger, char.health, char.willpower,
+      char.health_superficial, char.health_aggravated, char.willpower_superficial, char.willpower_aggravated]);
+
+  const set = (key, val) => setLs(s => ({ ...s, [key]: val }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try { await onSaveCard(char.id, ls); }
+    finally { setSaving(false); }
+  };
+
+  // Small +/− button used inside the card edit controls
+  const Btn = ({ onClick, children, disabled }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood disabled:opacity-30 transition-colors text-xs leading-none"
+    >{children}</button>
+  );
 
   return (
     <div
-      onClick={fullEditMode && onFullEdit ? () => onFullEdit(char.id) : undefined}
       className={`border rounded-lg p-4 flex flex-col gap-4 transition-colors ${
-        fullEditMode
-          ? "border-blood/60 cursor-pointer hover:border-blood hover:bg-blood-dark/10"
-          : "border-void-border hover:border-blood/40"
+        fullEditMode ? "border-blood/40" : "border-void-border hover:border-blood/40"
       }`}
       style={clanCardStyle(char.clan_name)}
     >
@@ -228,67 +270,67 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       {/* Blood Potency + Humanity + Hunger */}
       <div className="flex flex-col gap-1.5">
         {[
-          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood",   session: false },
-          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood",   session: false },
-          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger",  session: true  },
-        ].map(({ key, label, max, variant, session }) => (
+          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
+          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
+          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger" },
+        ].map(({ key, label, max, variant }) => (
           <div key={key} className="flex items-center gap-2">
             <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
             <DotTracker
-              value={char[key] ?? 0}
+              value={ls[key] ?? 0}
               max={max}
               variant={variant}
-              onSetValue={fullEditMode && isGM
-                ? (val) => session
-                  ? onSessionAdjust?.(char.id, key, val)
-                  : onGmAdjust?.(char.id, key, val)
-                : undefined}
+              onSetValue={fullEditMode && isGM ? (val) => set(key, val) : undefined}
             />
           </div>
         ))}
       </div>
 
-      {/* Health + Willpower — always 15 boxes, greyed out unused */}
+      {/* Health + Willpower */}
       <div className="flex flex-col gap-2">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-gray-600">Health</p>
-              {fullEditMode && isGM ? (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onGmAdjust?.(char.id, "health", Math.max(1, char.health - 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">−</button>
-                  <span className="text-xs text-gray-400 w-4 text-center">{char.health}</span>
-                  <button onClick={() => onGmAdjust?.(char.id, "health", Math.min(15, char.health + 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">+</button>
-                </div>
-              ) : (
-                <span className="text-gray-700 text-xs">({char.health} active)</span>
-              )}
+        {[
+          { label: "Health",    key: "health",    supKey: "health_superficial",    aggKey: "health_aggravated",    max: 15 },
+          { label: "Willpower", key: "willpower", supKey: "willpower_superficial", aggKey: "willpower_aggravated", max: 10 },
+        ].map(({ label, key, supKey, aggKey, max }) => (
+          <div key={key}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs text-gray-600">{label}</p>
+                {fullEditMode && isGM ? (
+                  <div className="flex items-center gap-1">
+                    <Btn onClick={() => set(key, Math.max(1, ls[key] - 1))}>−</Btn>
+                    <span className="text-xs text-gray-400 w-4 text-center">{ls[key]}</span>
+                    <Btn onClick={() => set(key, Math.min(max, ls[key] + 1))}>+</Btn>
+                  </div>
+                ) : (
+                  <span className="text-gray-700 text-xs">({char[key]} active)</span>
+                )}
+              </div>
+              <p className="text-gray-800 text-xs">
+                <span className="text-yellow-600">/ sup</span>
+                <span className="mx-1">·</span>
+                <span className="text-blood">× agg</span>
+              </p>
             </div>
-            <p className="text-gray-800 text-xs">
-              <span className="text-yellow-600">/ sup</span>
-              <span className="mx-1">·</span>
-              <span className="text-blood">× agg</span>
-            </p>
-          </div>
-          <DamageTrack active={char.health} superficial={char.health_superficial} aggravated={char.health_aggravated} />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-gray-600">Willpower</p>
-              {fullEditMode && isGM ? (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onGmAdjust?.(char.id, "willpower", Math.max(1, char.willpower - 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">−</button>
-                  <span className="text-xs text-gray-400 w-4 text-center">{char.willpower}</span>
-                  <button onClick={() => onGmAdjust?.(char.id, "willpower", Math.min(10, char.willpower + 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">+</button>
+            <DamageTrack active={ls[key]} superficial={ls[supKey]} aggravated={ls[aggKey]} />
+            {fullEditMode && isGM && (
+              <div className="flex gap-4 mt-1.5">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-yellow-600 w-8">/ Sup</span>
+                  <Btn onClick={() => set(supKey, Math.max(0, ls[supKey] - 1))}>−</Btn>
+                  <span className="text-xs text-yellow-600 w-4 text-center">{ls[supKey]}</span>
+                  <Btn onClick={() => set(supKey, Math.min(ls[key] - ls[aggKey], ls[supKey] + 1))}>+</Btn>
                 </div>
-              ) : (
-                <span className="text-gray-700 text-xs">({char.willpower} active)</span>
-              )}
-            </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-blood w-8">× Agg</span>
+                  <Btn onClick={() => set(aggKey, Math.max(0, ls[aggKey] - 1))}>−</Btn>
+                  <span className="text-xs text-blood w-4 text-center">{ls[aggKey]}</span>
+                  <Btn onClick={() => set(aggKey, Math.min(ls[key] - ls[supKey], ls[aggKey] + 1))}>+</Btn>
+                </div>
+              </div>
+            )}
           </div>
-          <DamageTrack active={char.willpower} superficial={char.willpower_superficial} aggravated={char.willpower_aggravated} />
-        </div>
+        ))}
       </div>
 
       {/* Disciplines + powers */}
@@ -392,6 +434,17 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
       )}
 
+      {/* Save button — shown in Full Edit mode */}
+      {fullEditMode && isGM && (
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-2 rounded border border-green-700 bg-green-900/20 text-green-400 hover:bg-green-800/40 font-gothic text-sm tracking-wider transition-colors disabled:opacity-50 mt-1"
+        >
+          {saving ? "Saving…" : "✓ Save"}
+        </button>
+      )}
+
     </div>
   );
 }
@@ -409,50 +462,11 @@ export default function SessionModePage() {
   // lastRollMap: username → most recent RollOut for that player
   const [lastRollMap, setLastRollMap] = useState({});
 
-  // Full edit save indicator
-  const [hasChanges, setHasChanges] = useState(false);
-  const [gmStatSaving, setGmStatSaving] = useState(false);
-
-  const flashSaved = () => setHasChanges(true);
-
-  // retainer modal
-  const [retainerModal, setRetainerModal]     = useState(null); // full character object
-  const [loadingRetainer, setLoadingRetainer] = useState(false);
-
-  // full-edit overlay (GM only)
-  const [editChar, setEditChar]         = useState(null);
-  const [loadingEdit, setLoadingEdit]   = useState(false);
   const [fullEditMode, setFullEditMode] = useState(false);
 
-  const adjustGmStat = useCallback(async (key, value) => {
-    if (!editChar) return;
-    setGmStatSaving(true);
-    try {
-      const res = await api.put(`/api/characters/${editChar.id}/gm-adjust`, { [key]: value });
-      setEditChar(res.data);
-      flashSaved();
-    } catch (_) {}
-    finally { setGmStatSaving(false); }
-  }, [editChar]);
-
-  const openFullEdit = useCallback(async (charId) => {
-    setLoadingEdit(true);
-    setEditChar(null);
-    setHasChanges(false);
-    editCharRef.current = charId;
-    try {
-      const res = await api.get(`/api/characters/${charId}`);
-      setEditChar(res.data);
-    } catch (_) {}
-    finally { setLoadingEdit(false); }
-  }, []);
-
-  const closeFullEdit = () => {
-    setEditChar(null);
-    setHasChanges(false);
-    editCharRef.current = null;
-    refresh();
-  };
+  // retainer modal
+  const [retainerModal, setRetainerModal]     = useState(null);
+  const [loadingRetainer, setLoadingRetainer] = useState(false);
 
   const openRetainer = useCallback(async (id) => {
     setLoadingRetainer(true);
@@ -502,8 +516,6 @@ export default function SessionModePage() {
     }
   }, [groupId]);
 
-  const editCharRef = useRef(null);
-
   const refresh = useCallback(async () => {
     try {
       const res = await api.get(`/api/groups/${groupId}`);
@@ -512,27 +524,26 @@ export default function SessionModePage() {
       setError(null);
       const ids = res.data.members.flatMap((m) => m.characters.map((c) => c.id));
       if (ids.length) fetchConditions(ids);
-      // If Full Edit overlay is open, also refresh that character
-      if (editCharRef.current) {
-        const charRes = await api.get(`/api/characters/${editCharRef.current}`);
-        setEditChar(charRes.data);
-      }
     } catch (e) {
       setError(e.response?.data?.detail ?? "Failed to load group.");
     }
   }, [groupId, fetchConditions]);
 
-  // Inline card stat adjustments (no overlay needed)
-  const handleCardGmAdjust = useCallback(async (charId, key, value) => {
+  const handleSaveCard = useCallback(async (charId, ls) => {
     try {
-      await api.put(`/api/characters/${charId}/gm-adjust`, { [key]: value });
-      refresh();
-    } catch (_) {}
-  }, [refresh]);
-
-  const handleCardSessionAdjust = useCallback(async (charId, key, value) => {
-    try {
-      await api.put(`/api/characters/${charId}/session`, { [key]: value });
+      await api.put(`/api/characters/${charId}/gm-adjust`, {
+        blood_potency: ls.blood_potency,
+        humanity:      ls.humanity,
+        health:        ls.health,
+        willpower:     ls.willpower,
+      });
+      await api.put(`/api/characters/${charId}/session`, {
+        current_hunger:        ls.current_hunger,
+        health_superficial:    ls.health_superficial,
+        health_aggravated:     ls.health_aggravated,
+        willpower_superficial: ls.willpower_superficial,
+        willpower_aggravated:  ls.willpower_aggravated,
+      });
       refresh();
     } catch (_) {}
   }, [refresh]);
@@ -609,7 +620,7 @@ export default function SessionModePage() {
       {fullEditMode && (
         <div className="flex items-center justify-between px-4 py-2 bg-blood-dark/20 border border-blood-dark/60 rounded mb-4 gap-3">
           <span className="text-sm font-gothic text-blood">
-            ⚑ Full Edit — click any character card to edit
+            ⚑ Full Edit — adjust stats and damage directly on each card, then press Save
           </span>
           <button
             onClick={() => setFullEditMode(false)}
@@ -639,9 +650,7 @@ export default function SessionModePage() {
               lastRoll={lastRollMap[player] ?? null}
               onOpenRetainer={openRetainer}
               fullEditMode={fullEditMode}
-              onFullEdit={isGM ? openFullEdit : undefined}
-              onGmAdjust={isGM ? handleCardGmAdjust : undefined}
-              onSessionAdjust={isGM ? handleCardSessionAdjust : undefined}
+              onSaveCard={isGM ? handleSaveCard : undefined}
             />
           ))}
         </div>
@@ -650,89 +659,6 @@ export default function SessionModePage() {
       {group && cards.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-gray-600 font-gothic text-xl">No characters in this group yet.</p>
-        </div>
-      )}
-
-      {/* ── Full-edit overlay (GM) ── */}
-      {(editChar || loadingEdit) && (
-        <div className="fixed inset-0 bg-black/85 z-50 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-3 border-b border-void-border bg-void-light shrink-0">
-            <div className="flex items-center gap-3">
-              <span className="font-gothic text-blood text-lg">
-                {loadingEdit ? "Opening…" : editChar?.name}
-              </span>
-              {!loadingEdit && (
-                <span className="text-xs font-gothic tracking-widest text-blood border border-blood-dark rounded px-2 py-0.5 uppercase">
-                  Full Edit
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={closeFullEdit}
-                className="text-sm font-gothic tracking-wider bg-green-900/40 hover:bg-green-800/60 border border-green-700 text-green-400 rounded px-4 py-1.5 transition-colors"
-              >
-                ✓ Save & Close
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 bg-void">
-            {loadingEdit ? (
-              <p className="font-gothic text-blood animate-pulse text-center mt-20">Opening the coffin…</p>
-            ) : editChar ? (
-              <>
-              {/* GM Quick Stats — permanent stat overrides */}
-              <div className="mb-6 border border-blood-dark/60 rounded-lg p-4 bg-blood-dark/10">
-                <p className="text-xs text-blood font-gothic tracking-widest uppercase mb-3">GM Quick Stats</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[
-                    { label: "HP Max",      key: "health",        min: 1,  max: 15, value: editChar.health },
-                    { label: "WP Max",      key: "willpower",     min: 1,  max: 10, value: editChar.willpower },
-                    { label: "Blood Pot.",  key: "blood_potency", min: 0,  max: 5,  value: editChar.blood_potency },
-                    { label: "Humanity",    key: "humanity",      min: 0,  max: 10, value: editChar.humanity },
-                  ].map(({ label, key, min, max, value }) => (
-                    <div key={key} className="flex flex-col items-center gap-1">
-                      <span className="text-xs text-gray-500 font-gothic">{label}</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => adjustGmStat(key, Math.max(min, value - 1))}
-                          disabled={value <= min || gmStatSaving}
-                          className="w-7 h-7 rounded border border-void-border text-gray-400 hover:border-blood hover:text-blood disabled:opacity-30 transition-colors text-base leading-none"
-                        >−</button>
-                        <span className="text-gray-200 font-gothic text-lg w-6 text-center">{value}</span>
-                        <button
-                          onClick={() => adjustGmStat(key, Math.min(max, value + 1))}
-                          disabled={value >= max || gmStatSaving}
-                          className="w-7 h-7 rounded border border-void-border text-gray-400 hover:border-blood hover:text-blood disabled:opacity-30 transition-colors text-base leading-none"
-                        >+</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <CharacterSheet
-                character={editChar}
-                freeEdit
-                onImprove={async (traitType, traitName, extra = {}) => {
-                  const res = await api.post(`/api/characters/${editChar.id}/improve`, { trait_type: traitType, trait_name: traitName || undefined, ...extra, free: true });
-                  setEditChar(res.data); flashSaved();
-                }}
-                onUnimprove={async (traitType, traitName, extra = {}) => {
-                  const res = await api.post(`/api/characters/${editChar.id}/unimprove`, { trait_type: traitType, trait_name: traitName || undefined, ...extra });
-                  setEditChar(res.data); flashSaved();
-                }}
-                onCharacterUpdate={(updated) => { setEditChar(updated); flashSaved(); }}
-                onAddWeapon={async (w) => { const res = await api.post(`/api/characters/${editChar.id}/weapons`, w); setEditChar(res.data); flashSaved(); }}
-                onDeleteWeapon={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/weapons/${id}`); setEditChar(res.data); flashSaved(); }}
-                onAddPossession={async (p) => { const res = await api.post(`/api/characters/${editChar.id}/possessions`, p); setEditChar(res.data); flashSaved(); }}
-                onDeletePossession={async (id) => { const res = await api.delete(`/api/characters/${editChar.id}/possessions/${id}`); setEditChar(res.data); flashSaved(); }}
-                onAddSpecialty={async (skillName, specialtyName) => { const res = await api.post(`/api/characters/${editChar.id}/specialties`, { skill_name: skillName, specialty_name: specialtyName }); setEditChar(res.data); flashSaved(); }}
-                onDeleteSpecialty={async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${editChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setEditChar(res.data); flashSaved(); }}
-                onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${editChar.id}/claim-predator-power`, { power_id: powerId }); setEditChar(res.data); flashSaved(); } catch {} }}
-              />
-              </>
-            ) : null}
-          </div>
         </div>
       )}
 
