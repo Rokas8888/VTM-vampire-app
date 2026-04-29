@@ -58,12 +58,16 @@ function DamageTrack({ active, superficial, aggravated }) {
   );
 }
 
-function DotTracker({ value, max, variant = "blood" }) {
+function DotTracker({ value, max, variant = "blood", onSetValue }) {
   const filledCls = variant === "hunger" ? "bg-red-700 border-red-700" : "bg-blood border-blood";
   return (
     <div className="flex gap-1 flex-wrap">
       {Array.from({ length: max }, (_, i) => (
-        <div key={i} className={`w-5 h-5 rounded-full border ${i < value ? filledCls : "border-gray-700"}`} />
+        <div
+          key={i}
+          onClick={onSetValue ? (e) => { e.stopPropagation(); onSetValue(i + 1 === value ? i : i + 1); } : undefined}
+          className={`w-5 h-5 rounded-full border ${i < value ? filledCls : "border-gray-700"} ${onSetValue ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
+        />
       ))}
     </div>
   );
@@ -165,7 +169,7 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit, fullEditMode }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onFullEdit, fullEditMode, onGmAdjust, onSessionAdjust }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
@@ -224,13 +228,22 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       {/* Blood Potency + Humanity + Hunger */}
       <div className="flex flex-col gap-1.5">
         {[
-          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
-          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
-          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger" },
-        ].map(({ key, label, max, variant }) => (
+          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood",   session: false },
+          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood",   session: false },
+          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger",  session: true  },
+        ].map(({ key, label, max, variant, session }) => (
           <div key={key} className="flex items-center gap-2">
             <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
-            <DotTracker value={char[key] ?? 0} max={max} variant={variant} />
+            <DotTracker
+              value={char[key] ?? 0}
+              max={max}
+              variant={variant}
+              onSetValue={fullEditMode && isGM
+                ? (val) => session
+                  ? onSessionAdjust?.(char.id, key, val)
+                  : onGmAdjust?.(char.id, key, val)
+                : undefined}
+            />
           </div>
         ))}
       </div>
@@ -239,7 +252,18 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       <div className="flex flex-col gap-2">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs text-gray-600">Health <span className="text-gray-700">({char.health} active)</span></p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-gray-600">Health</p>
+              {fullEditMode && isGM ? (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onGmAdjust?.(char.id, "health", Math.max(1, char.health - 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">−</button>
+                  <span className="text-xs text-gray-400 w-4 text-center">{char.health}</span>
+                  <button onClick={() => onGmAdjust?.(char.id, "health", Math.min(15, char.health + 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">+</button>
+                </div>
+              ) : (
+                <span className="text-gray-700 text-xs">({char.health} active)</span>
+              )}
+            </div>
             <p className="text-gray-800 text-xs">
               <span className="text-yellow-600">/ sup</span>
               <span className="mx-1">·</span>
@@ -250,7 +274,18 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs text-gray-600">Willpower <span className="text-gray-700">({char.willpower} active)</span></p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-gray-600">Willpower</p>
+              {fullEditMode && isGM ? (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onGmAdjust?.(char.id, "willpower", Math.max(1, char.willpower - 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">−</button>
+                  <span className="text-xs text-gray-400 w-4 text-center">{char.willpower}</span>
+                  <button onClick={() => onGmAdjust?.(char.id, "willpower", Math.min(10, char.willpower + 1))} className="w-5 h-5 rounded border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors text-xs leading-none">+</button>
+                </div>
+              ) : (
+                <span className="text-gray-700 text-xs">({char.willpower} active)</span>
+              )}
+            </div>
           </div>
           <DamageTrack active={char.willpower} superficial={char.willpower_superficial} aggravated={char.willpower_aggravated} />
         </div>
@@ -380,6 +415,15 @@ export default function SessionModePage() {
 
   const flashSaved = () => setHasChanges(true);
 
+  // retainer modal
+  const [retainerModal, setRetainerModal]     = useState(null); // full character object
+  const [loadingRetainer, setLoadingRetainer] = useState(false);
+
+  // full-edit overlay (GM only)
+  const [editChar, setEditChar]         = useState(null);
+  const [loadingEdit, setLoadingEdit]   = useState(false);
+  const [fullEditMode, setFullEditMode] = useState(false);
+
   const adjustGmStat = useCallback(async (key, value) => {
     if (!editChar) return;
     setGmStatSaving(true);
@@ -391,14 +435,20 @@ export default function SessionModePage() {
     finally { setGmStatSaving(false); }
   }, [editChar]);
 
-  // retainer modal
-  const [retainerModal, setRetainerModal]     = useState(null); // full character object
-  const [loadingRetainer, setLoadingRetainer] = useState(false);
+  // Inline card stat adjustments (no overlay needed)
+  const handleCardGmAdjust = useCallback(async (charId, key, value) => {
+    try {
+      await api.put(`/api/characters/${charId}/gm-adjust`, { [key]: value });
+      refresh();
+    } catch (_) {}
+  }, [refresh]);
 
-  // full-edit overlay (GM only)
-  const [editChar, setEditChar]         = useState(null);
-  const [loadingEdit, setLoadingEdit]   = useState(false);
-  const [fullEditMode, setFullEditMode] = useState(false);
+  const handleCardSessionAdjust = useCallback(async (charId, key, value) => {
+    try {
+      await api.put(`/api/characters/${charId}/session`, { [key]: value });
+      refresh();
+    } catch (_) {}
+  }, [refresh]);
 
   const openFullEdit = useCallback(async (charId) => {
     setLoadingEdit(true);
@@ -590,6 +640,8 @@ export default function SessionModePage() {
               onOpenRetainer={openRetainer}
               fullEditMode={fullEditMode}
               onFullEdit={isGM ? openFullEdit : undefined}
+              onGmAdjust={isGM ? handleCardGmAdjust : undefined}
+              onSessionAdjust={isGM ? handleCardSessionAdjust : undefined}
             />
           ))}
         </div>
