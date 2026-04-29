@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.database import get_db
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse, RefreshRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse, RefreshRequest, SetPasswordRequest
 from app.models.user import User, UserRole, RefreshToken
 from app.services.auth import (
     hash_password, verify_password,
@@ -93,3 +93,19 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
 def me(current_user: User = Depends(get_current_user)):
     """Return the currently logged-in user's info."""
     return current_user
+
+
+@router.post("/set-password")
+def set_password(
+    body: SetPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set a new password. Clears the force_password_reset flag."""
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+    user = db.query(User).filter(User.id == current_user.id).first()
+    user.hashed_password = hash_password(body.new_password)
+    user.force_password_reset = False
+    db.commit()
+    return {"message": "Password updated."}

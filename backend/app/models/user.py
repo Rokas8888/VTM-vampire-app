@@ -21,6 +21,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.player, nullable=False)
     is_active = Column(Boolean, default=True)
+    force_password_reset = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # One user can have many refresh tokens (one per device/session)

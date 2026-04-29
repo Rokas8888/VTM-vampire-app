@@ -1,0 +1,181 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
+  .vtm { font-family: 'Inter', sans-serif; }
+  .cinzel { font-family: 'Cinzel', serif; }
+  .tag { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:3px; margin-right:4px; letter-spacing:0.05em; }
+  .tag-fast { background:#14532d; color:#86efac; }
+  .tag-med  { background:#713f12; color:#fcd34d; }
+  .tag-hard { background:#7f1d1d; color:#fca5a5; }
+  .feature-row { display:flex; gap:16px; margin-bottom:16px; padding:14px; background:#141414; border:1px solid #2a2a2a; border-left:3px solid #8B0000; border-radius:3px; }
+  .feature-icon { font-size:22px; flex-shrink:0; }
+  .feature-body { flex:1; }
+  .feature-title { font-family:'Cinzel',serif; font-size:13px; color:#e0e0e0; margin:0 0 4px; }
+  .feature-desc  { font-size:12px; color:#6a6a6a; margin:0 0 6px; line-height:1.5; }
+  .feature-approach { font-size:11px; color:#9a9a9a; font-style:italic; background:#0a0a0a; border:1px solid #2a2a2a; padding:6px 10px; border-radius:3px; }
+  .section-head { font-family:'Cinzel',serif; font-size:15px; color:#DC143C; letter-spacing:0.1em; text-transform:uppercase; margin:28px 0 14px; border-bottom:1px solid #2a2a2a; padding-bottom:8px; }
+</style>
+
+<h2>Scene Maker — Full Improvement Plan</h2>
+<p class="subtitle vtm">All 7 improvements: design revert + 6 UX wins + 3D visual quality. Here's the full approach before we write the spec.</p>
+
+<div class="section-head">Part 1 — Design Revert</div>
+
+<div class="feature-row">
+  <div class="feature-icon">🎨</div>
+  <div class="feature-body">
+    <div class="feature-title">Remove Gothic Overhaul → VTM App Design <span class="tag tag-fast">Fast</span></div>
+    <div class="feature-desc">Strip out the injected GOTHIC_CSS block, all Cormorant/UnifrakturCook fonts, gold CSS variables, corner SVG ornaments, and fraktur branding. Replace with standard Tailwind classes matching the rest of the app — <code style="color:#DC143C;">bg-void</code>, <code style="color:#DC143C;">border-void-border</code>, <code style="color:#DC143C;">text-blood</code>, Cinzel for headers, Inter for body.</div>
+    <div class="feature-approach">No new behaviour — pure visual cleanup. The 3D canvas itself stays the same.</div>
+  </div>
+</div>
+
+<div class="section-head">Part 2 — Visual Quality (3D)</div>
+
+<div class="feature-row">
+  <div class="feature-icon">✨</div>
+  <div class="feature-body">
+    <div class="feature-title">Post-Processing: SSAO + Bloom <span class="tag tag-med">Medium</span></div>
+    <div class="feature-desc">
+      <strong style="color:#e0e0e0;">SSAO (Ambient Occlusion)</strong> — the single biggest quality jump. Right now objects look like they're floating because there's no contact shadow between them. SSAO adds subtle darkening where surfaces meet walls, floors, and furniture. Makes assets look "grounded."<br><br>
+      <strong style="color:#e0e0e0;">Bloom</strong> — selective glow only on lit objects (torches, candles). Torches get a warm orange halo; the rest of the scene stays sharp. Uses <code style="color:#DC143C;">@react-three/postprocessing</code> which wraps the canvas.
+    </div>
+    <div class="feature-approach">Install <code>@react-three/postprocessing</code>. Wrap canvas in &lt;EffectComposer&gt; with &lt;SSAO radius=0.5 intensity=40&gt; + &lt;Bloom luminanceThreshold=1 mipmapBlur&gt;. Torch/candle materials get emissiveIntensity &gt; 1 to catch bloom.</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">💡</div>
+  <div class="feature-body">
+    <div class="feature-title">Better Lighting & Shadows <span class="tag tag-fast">Fast</span></div>
+    <div class="feature-desc">Current hemisphere light is flat. Add a warmer key light + cooler fill light to create depth. Increase shadow map resolution from 1024 to 2048. Add subtle ground plane reflection using a dark MeshStandardMaterial with low roughness.</div>
+    <div class="feature-approach">Tweak AtmosphereLights component — raise shadow-mapSize to 2048, adjust hemisphere sky/ground colours, add a second fill pointLight. No new dependencies.</div>
+  </div>
+</div>
+
+<div class="section-head">Part 3 — UX Improvements</div>
+
+<div class="feature-row">
+  <div class="feature-icon">🔍</div>
+  <div class="feature-body">
+    <div class="feature-title">A — Asset Search / Filter <span class="tag tag-fast">Fast</span></div>
+    <div class="feature-desc">203 models in a scrollable list is painful. Add a text input at the top of the left panel. Typing filters all category items by name in real time. Matching categories expand automatically; empty categories hide.</div>
+    <div class="feature-approach">One <code>searchTerm</code> state variable. Filter <code>Object.entries(ASSET_CATEGORIES)</code> on render. No backend needed.</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">↩️</div>
+  <div class="feature-body">
+    <div class="feature-title">B — Undo / Redo (Ctrl+Z / Ctrl+Y) <span class="tag tag-med">Medium</span></div>
+    <div class="feature-desc">Every paint or erase action saves the previous grid state to a history stack. Ctrl+Z pops the last state; Ctrl+Y redoes. Max 40 snapshots to keep memory reasonable (28×28 = 784 cells per snapshot).</div>
+    <div class="feature-approach"><code>historyRef</code> = array of grid snapshots. On every cell change push current grid before mutating. Keyboard listener for Ctrl+Z/Y. No performance issue — each snapshot is a plain JS array of small objects.</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">🔄</div>
+  <div class="feature-body">
+    <div class="feature-title">C — Object Rotation (R key) <span class="tag tag-med">Medium</span></div>
+    <div class="feature-desc">Press R to cycle the active brush through 0° / 90° / 180° / 270°. The rotation is stored per placed tile, so each cell remembers its own rotation. Essential for aligning doors, furniture against walls, etc.</div>
+    <div class="feature-approach">Add <code>brushRotation</code> state (0, π/2, π, 3π/2). Cell data gains a <code>rotY</code> field per slot (floor/wall/object). Tile component reads <code>cell.object.rotY</code>. Keyboard listener for R key.</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">👻</div>
+  <div class="feature-body">
+    <div class="feature-title">D — Ghost Preview on Hover <span class="tag tag-med">Medium</span></div>
+    <div class="feature-desc">As you move the cursor over the grid, a translucent (50% opacity) version of the selected asset appears under the mouse. You always know exactly what and where you're about to place. Disappears when no asset is selected or in erase mode.</div>
+    <div class="feature-approach">Track <code>hoveredIdx</code> in state. Render an extra <code>&lt;Tile&gt;</code> at that position with all materials set to <code>transparent=true, opacity=0.45</code> via <code>scene.traverse</code>. Use a separate <code>useMemo</code> key so it doesn't interfere with real tiles.</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">🖌️</div>
+  <div class="feature-body">
+    <div class="feature-title">E — Better Fill Tools <span class="tag tag-med">Medium</span></div>
+    <div class="feature-desc">
+      <strong style="color:#e0e0e0;">Fill Floor</strong> — already exists. Keep it.<br>
+      <strong style="color:#e0e0e0;">Rectangle Fill</strong> — hold Shift + drag to mark a rectangle, release to fill every cell in that area with the selected asset.<br>
+      <strong style="color:#e0e0e0;">Clear Section</strong> — hold Shift in Erase mode to drag-erase a rectangle area at once.
+    </div>
+    <div class="feature-approach">Add <code>shiftDragStart</code> ref. On Shift+pointerdown record start cell. On Shift+pointerup calculate bounding box and bulk-update grid. Visual feedback: highlight the selected rectangle during drag (coloured hit planes).</div>
+  </div>
+</div>
+
+<div class="feature-row">
+  <div class="feature-icon">💾</div>
+  <div class="feature-body">
+    <div class="feature-title">F — Save / Load Scene <span class="tag tag-hard">Complex</span></div>
+    <div class="feature-desc">Scenes are currently lost on page refresh. Add save/load to the database per GM group. The GM can name a scene, save it, and load it back any time. One scene per group (can expand to multiple later).</div>
+    <div class="feature-approach">
+      <strong style="color:#e0e0e0;">Backend:</strong> New <code>scenes</code> table — <code>id, group_id (FK), name, data (JSONB), updated_at</code>. Alembic migration 023. Two endpoints: <code>GET /api/scenes/{group_id}</code> + <code>PUT /api/scenes/{group_id}</code>.<br><br>
+      <strong style="color:#e0e0e0;">Frontend:</strong> Save button in topbar. On load, fetch scene for current group. Auto-save every 30s if grid changed. Scene data = grid array serialised as JSON.
+    </div>
+  </div>
+</div>
+
+<div class="section-head">Build Order</div>
+
+<div class="vtm" style="background:#0a0a0a; border:1px solid #2a2a2a; border-radius:4px; overflow:hidden;">
+  <table style="width:100%; border-collapse:collapse; font-size:12px;">
+    <thead>
+      <tr style="background:#141414; border-bottom:1px solid #2a2a2a;">
+        <th style="padding:8px 12px; text-align:left; color:#9a9a9a; font-family:'Cinzel',serif; font-size:11px; letter-spacing:0.08em;">Step</th>
+        <th style="padding:8px 12px; text-align:left; color:#9a9a9a; font-family:'Cinzel',serif; font-size:11px; letter-spacing:0.08em;">What</th>
+        <th style="padding:8px 12px; text-align:left; color:#9a9a9a; font-family:'Cinzel',serif; font-size:11px; letter-spacing:0.08em;">Why first</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #1e1e1e;">
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">1</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">Design Revert</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">Clean slate before touching any other UI</td>
+      </tr>
+      <tr style="border-bottom:1px solid #1e1e1e;">
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">2</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">Asset Search</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">Tiny change, immediate usability win</td>
+      </tr>
+      <tr style="border-bottom:1px solid #1e1e1e;">
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">3</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">Undo / Redo + Rotation + Ghost Preview</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">All touch the same cell/grid logic — do together</td>
+      </tr>
+      <tr style="border-bottom:1px solid #1e1e1e;">
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">4</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">Better Fill Tools</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">Builds on existing drag logic</td>
+      </tr>
+      <tr style="border-bottom:1px solid #1e1e1e;">
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">5</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">SSAO + Bloom + Better Lighting</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">Visual layer — separate from interaction logic</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px; color:#DC143C; font-family:'Cinzel',serif;">6</td>
+        <td style="padding:8px 12px; color:#e0e0e0;">Save / Load</td>
+        <td style="padding:8px 12px; color:#6a6a6a;">Needs backend — do last once scene logic is stable</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="subtitle vtm" style="margin-top:20px;">Does this plan look right? Any changes before I write the full spec?</p>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Looks good — write the spec</h3>
+      <p>I'm happy with the plan and build order. Write it up and let's get started.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">~</div>
+    <div class="content">
+      <h3>I want to change something first</h3>
+      <p>Tell me what to adjust in the terminal.</p>
+    </div>
+  </div>
+</div>

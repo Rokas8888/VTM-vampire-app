@@ -1,0 +1,169 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
+  .vtm-mock { font-family: 'Inter', sans-serif; }
+  .vtm-heading { font-family: 'Cinzel', serif; }
+</style>
+
+<h2>Scene Maker — Restoring Original Design + UX Improvements</h2>
+<p class="subtitle">First, here's what the scene maker will look like with the real VTM design applied. Then pick which UX improvements you want.</p>
+
+<!-- MOCKUP: Original VTM design applied to Scene Maker -->
+<div class="mockup" style="margin-bottom: 32px;">
+  <div class="mockup-header">Scene Maker — VTM Design (Cinzel + blood red + void black)</div>
+  <div class="mockup-body vtm-mock" style="background:#0a0a0a; padding:0; min-height:320px; display:flex; flex-direction:column; border:1px solid #2a2a2a;">
+
+    <!-- Topbar -->
+    <div style="background:#141414; border-bottom:1px solid #2a2a2a; padding:8px 16px; display:flex; align-items:center; justify-content:space-between;">
+      <div class="vtm-heading" style="font-size:14px; font-weight:600; color:#DC143C; letter-spacing:0.12em;">Scene Maker</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span style="font-size:11px; color:#9a9a9a; font-family:'Inter',sans-serif;">Walls · Stone</span>
+        <div style="width:1px; height:14px; background:#2a2a2a; margin:0 4px;"></div>
+        <span style="background:#8B0000; color:#e0e0e0; font-size:11px; padding:3px 14px; border-radius:3px; font-family:'Cinzel',serif; letter-spacing:0.08em;">Place</span>
+        <span style="background:transparent; border:1px solid #2a2a2a; color:#6a6a6a; font-size:11px; padding:3px 14px; border-radius:3px; font-family:'Cinzel',serif; letter-spacing:0.08em;">Erase</span>
+        <span style="background:transparent; border:1px solid #2a2a2a; color:#6a6a6a; font-size:11px; padding:3px 14px; border-radius:3px; font-family:'Cinzel',serif; letter-spacing:0.08em;">Clear</span>
+      </div>
+    </div>
+
+    <!-- 3-col body -->
+    <div style="display:flex; flex:1; min-height:260px;">
+
+      <!-- Left panel: Assets -->
+      <div style="width:110px; background:#0a0a0a; border-right:1px solid #2a2a2a; overflow:hidden;">
+        <div style="padding:10px 12px 6px; border-bottom:1px solid #2a2a2a;">
+          <div class="vtm-heading" style="font-size:11px; color:#DC143C; letter-spacing:0.1em; text-transform:uppercase;">Assets</div>
+        </div>
+        <!-- Category: Walls (active) -->
+        <div style="padding:6px 12px; background:#141414; border-left:3px solid #DC143C; border-bottom:1px solid #2a2a2a;">
+          <span class="vtm-heading" style="font-size:11px; color:#e0e0e0; letter-spacing:0.08em;">Walls</span>
+        </div>
+        <!-- Items under Walls -->
+        <div style="padding:4px 12px; background:#1e1e1e; border-left:3px solid #8B0000; border-bottom:1px solid #2a2a2a;">
+          <span style="font-size:11px; color:#DC143C;">Stone</span>
+        </div>
+        <div style="padding:4px 12px; border-bottom:1px solid #1a1a1a;">
+          <span style="font-size:11px; color:#6a6a6a;">Arched</span>
+        </div>
+        <div style="padding:4px 12px; border-bottom:1px solid #1a1a1a;">
+          <span style="font-size:11px; color:#6a6a6a;">Cracked</span>
+        </div>
+        <!-- Category: Floors (collapsed) -->
+        <div style="padding:6px 12px; border-left:3px solid transparent; border-bottom:1px solid #2a2a2a;">
+          <span class="vtm-heading" style="font-size:11px; color:#9a9a9a; letter-spacing:0.08em;">Floors</span>
+        </div>
+        <div style="padding:6px 12px; border-left:3px solid transparent; border-bottom:1px solid #2a2a2a;">
+          <span class="vtm-heading" style="font-size:11px; color:#9a9a9a; letter-spacing:0.08em;">Furniture</span>
+        </div>
+        <div style="padding:6px 12px; border-left:3px solid transparent; border-bottom:1px solid #2a2a2a;">
+          <span class="vtm-heading" style="font-size:11px; color:#9a9a9a; letter-spacing:0.08em;">Lighting</span>
+        </div>
+      </div>
+
+      <!-- Center: 3D canvas -->
+      <div style="flex:1; background:#050505; display:flex; align-items:center; justify-content:center; position:relative;">
+        <div style="text-align:center; color:#2a2a2a;">
+          <div style="font-size:32px; margin-bottom:8px;">⬛</div>
+          <div class="vtm-heading" style="font-size:10px; color:#3a3a3a; text-transform:uppercase; letter-spacing:0.15em;">3D Canvas</div>
+        </div>
+        <!-- Status bar -->
+        <div style="position:absolute; bottom:8px; left:8px; right:8px; background:#141414; border:1px solid #2a2a2a; border-radius:3px; padding:5px 12px; display:flex; gap:12px; align-items:center; justify-content:center;">
+          <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Left-click place</span>
+          <span style="color:#2a2a2a;">·</span>
+          <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Right-click delete</span>
+          <span style="color:#2a2a2a;">·</span>
+          <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Middle-drag pan</span>
+          <span style="color:#2a2a2a;">·</span>
+          <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Scroll zoom</span>
+        </div>
+      </div>
+
+      <!-- Right panel: Atmosphere -->
+      <div style="width:100px; background:#0a0a0a; border-left:1px solid #2a2a2a; overflow:hidden;">
+        <div style="padding:10px 12px 6px; border-bottom:1px solid #2a2a2a;">
+          <div class="vtm-heading" style="font-size:11px; color:#DC143C; letter-spacing:0.1em; text-transform:uppercase;">Atmos.</div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #2a2a2a;">
+          <div style="font-size:10px; color:#9a9a9a; margin-bottom:6px; font-family:'Inter',sans-serif;">Time · 23:00</div>
+          <div style="height:3px; background:#2a2a2a; border-radius:2px; position:relative;">
+            <div style="position:absolute; left:65%; top:-4px; width:10px; height:10px; background:#DC143C; border-radius:50%;"></div>
+          </div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #2a2a2a;">
+          <div style="font-size:10px; color:#9a9a9a; margin-bottom:6px; font-family:'Inter',sans-serif;">Fog · 18%</div>
+          <div style="height:3px; background:#2a2a2a; border-radius:2px; position:relative;">
+            <div style="position:absolute; left:30%; top:-4px; width:10px; height:10px; background:#DC143C; border-radius:50%;"></div>
+          </div>
+        </div>
+        <div style="padding:6px 0;">
+          <div style="padding:4px 12px; background:#141414; border-left:3px solid #8B0000;">
+            <span style="font-size:10px; color:#DC143C; font-family:'Inter',sans-serif;">Night</span>
+          </div>
+          <div style="padding:4px 12px;">
+            <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Dawn</span>
+          </div>
+          <div style="padding:4px 12px;">
+            <span style="font-size:10px; color:#6a6a6a; font-family:'Inter',sans-serif;">Forest</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- UX IMPROVEMENTS -->
+<h3>Which UX improvements do you want?</h3>
+<p class="subtitle">Select all that feel right — these are the biggest quality-of-life wins for the scene maker.</p>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="undo" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Undo / Redo (Ctrl+Z)</h3>
+      <p>Right now one wrong click ruins a wall run. Undo makes building much less frustrating.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="rotation" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Object Rotation (R key)</h3>
+      <p>Cycle placed objects through 0° / 90° / 180° / 270°. Essential for furniture and doors.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="preview" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Ghost Preview Before Placing</h3>
+      <p>Show a translucent version of the selected asset under the cursor before you click. You always know what you're about to place.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="save" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Save / Load Scene</h3>
+      <p>Scenes are lost on page refresh. Save to the database per group, load back anytime. Already planned in the backlog.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="fill" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Better Fill Tools</h3>
+      <p>Fill Floor already exists, but add Fill Room (walls around a rectangle) and Clear Section (erase a dragged area) for faster scene building.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="search" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Asset Search / Filter</h3>
+      <p>203 models in a list is hard to navigate. Add a search box at the top to filter by name instantly.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Select as many as you want, then tell me in the terminal which ones you'd like to build first.</p>

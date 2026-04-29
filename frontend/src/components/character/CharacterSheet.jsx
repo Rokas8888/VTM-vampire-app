@@ -584,9 +584,11 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
   // Per-skill "add specialty" input state
   const [addingSpecialtyFor, setAddingSpecialtyFor] = useState(null);
   const [newSpecialtyText, setNewSpecialtyText] = useState("");
+  const [openSpecs, setOpenSpecs] = useState({});
+  const toggleSpecs = (skillName) => setOpenSpecs((prev) => ({ ...prev, [skillName]: !prev[skillName] }));
 
   return (
-    <div className="flex-1 min-w-[160px]">
+    <div>
       <p className="font-gothic text-blood-dark text-sm tracking-wider uppercase mb-2">{heading}</p>
       {names.map((name) => {
         const val         = lookup[name] ?? 0;
@@ -600,7 +602,17 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
         return (
           <div key={name} className="mb-2">
             <div className="flex justify-between items-center gap-2">
-              <span className="text-gray-300 text-sm truncate">{displayName}</span>
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="text-gray-300 text-sm truncate">{displayName}</span>
+                {traitType === "skill" && specs.length > 0 && (
+                  <button
+                    onClick={() => toggleSpecs(name)}
+                    className="text-[10px] text-gray-600 hover:text-blood transition-colors shrink-0 leading-none"
+                  >
+                    {openSpecs[name] ? "▲" : `▼${specs.length}`}
+                  </button>
+                )}
+              </div>
             <div className="flex items-center gap-1 shrink-0">
               {/* Undo improve / temp remove */}
               {onUnimprove ? (
@@ -656,62 +668,67 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
             </div>
           </div>
 
-          {/* Specialties — shown below skill row in improve/freeEdit mode */}
-          {traitType === "skill" && (
+          {/* Specialties — collapsible on mobile, always open on sm+ */}
+          {traitType === "skill" && (specs.length > 0 || (canEditSpecialties && val > 0)) && (
             <div className="ml-0 mt-0.5">
-              {specs.map((sp) => (
-                <span key={sp} className="inline-flex items-center gap-1 text-blood-dark text-xs mr-2">
-                  <span className="italic">{sp}</span>
-                  {canEditSpecialties && onDeleteSpecialty && (
+              {/* Specialty list — always visible on sm+, toggle-gated on mobile via inline ▼ button */}
+              <div className={`${specs.length > 0 && !openSpecs[name] ? "hidden" : "block"}`}>
+                {specs.map((sp) => (
+                  <span key={sp} className="inline-flex items-center gap-1 text-blood-dark text-xs mr-2">
+                    <span className="italic">{sp}</span>
+                    {canEditSpecialties && onDeleteSpecialty && (
+                      <button
+                        onClick={() => onDeleteSpecialty(name, sp)}
+                        title="Remove specialty"
+                        className="text-gray-700 hover:text-blood leading-none transition-colors"
+                      >✕</button>
+                    )}
+                  </span>
+                ))}
+
+                {/* Add specialty */}
+                {canEditSpecialties && onAddSpecialty && val > 0 && (
+                  isAddingHere ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        autoFocus
+                        className="bg-void border border-void-border rounded px-2 py-0.5 text-xs text-gray-200 focus:outline-none focus:border-blood w-full sm:w-28"
+                        placeholder="Specialty…"
+                        value={newSpecialtyText}
+                        onChange={(e) => setNewSpecialtyText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newSpecialtyText.trim()) {
+                            onAddSpecialty(name, newSpecialtyText.trim());
+                            setNewSpecialtyText("");
+                            setAddingSpecialtyFor(null);
+                          }
+                          if (e.key === "Escape") { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (newSpecialtyText.trim()) {
+                            onAddSpecialty(name, newSpecialtyText.trim());
+                            setNewSpecialtyText("");
+                            setAddingSpecialtyFor(null);
+                          }
+                        }}
+                        className="text-blood text-xs hover:text-red-400 shrink-0"
+                      >✓</button>
+                      <button
+                        onClick={() => { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }}
+                        className="text-gray-600 text-xs hover:text-gray-400 shrink-0"
+                      >✕</button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => onDeleteSpecialty(name, sp)}
-                      title="Remove specialty"
-                      className="text-gray-700 hover:text-blood leading-none transition-colors"
-                    >✕</button>
-                  )}
-                </span>
-              ))}
-              {canEditSpecialties && onAddSpecialty && val > 0 && (
-                isAddingHere ? (
-                  <div className="flex items-center gap-1 mt-1">
-                    <input
-                      autoFocus
-                      className="bg-void border border-void-border rounded px-2 py-0.5 text-xs text-gray-200 focus:outline-none focus:border-blood w-28"
-                      placeholder="Specialty…"
-                      value={newSpecialtyText}
-                      onChange={(e) => setNewSpecialtyText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newSpecialtyText.trim()) {
-                          onAddSpecialty(name, newSpecialtyText.trim());
-                          setNewSpecialtyText("");
-                          setAddingSpecialtyFor(null);
-                        }
-                        if (e.key === "Escape") { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }
-                      }}
-                    />
-                    <button
-                      onClick={() => {
-                        if (newSpecialtyText.trim()) {
-                          onAddSpecialty(name, newSpecialtyText.trim());
-                          setNewSpecialtyText("");
-                          setAddingSpecialtyFor(null);
-                        }
-                      }}
-                      className="text-blood text-xs hover:text-red-400"
-                    >✓</button>
-                    <button
-                      onClick={() => { setAddingSpecialtyFor(null); setNewSpecialtyText(""); }}
-                      className="text-gray-600 text-xs hover:text-gray-400"
-                    >✕</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setAddingSpecialtyFor(name); setNewSpecialtyText(""); }}
-                    className="text-gray-700 hover:text-blood text-xs transition-colors"
-                    title="Add specialty"
-                  >+ spec</button>
-                )
-              )}
+                      onClick={() => { setAddingSpecialtyFor(name); setNewSpecialtyText(""); }}
+                      className="text-gray-700 hover:text-blood text-xs transition-colors"
+                      title="Add specialty"
+                    >+ spec</button>
+                  )
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1337,7 +1354,7 @@ export default function CharacterSheet({
       <Section title="Attributes">
         {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 5 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
         {tempMode && <p className="text-xs text-blue-500/70 mb-3">Temp mode active — blue dots are temporary and not XP-spent.</p>}
-        <div className="flex flex-wrap gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
           <StatColumn heading="Physical" names={PHYSICAL_ATTRS}  lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
           <StatColumn heading="Social"   names={SOCIAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
@@ -1350,7 +1367,7 @@ export default function CharacterSheet({
       {/* ── Skills ── */}
       <Section title="Skills">
         {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 3 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
-        <div className="flex flex-wrap gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
           <StatColumn heading="Physical" names={PHYSICAL_SKILLS} lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
             onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />

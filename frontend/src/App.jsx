@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import useAuthStore from "./store/authStore";
 import ToastContainer from "./components/shared/ToastContainer";
 import LoginPage from "./pages/LoginPage";
+import SetPasswordPage from "./pages/SetPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import WizardPage from "./pages/WizardPage";
 import GMDashboardPage from "./pages/GMDashboardPage";
@@ -22,11 +23,19 @@ function Loading() {
   );
 }
 
-// Protects routes — redirects to login if not authenticated
+// Protects routes — redirects to login if not authenticated, or /set-password if reset is required
 function PrivateRoute({ children, allowedRoles }) {
   const { user } = useAuthStore();
   if (!user) return <Navigate to="/login" replace />;
+  if (user.force_password_reset) return <Navigate to="/set-password" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+// Minimal guard for /set-password — only requires being logged in
+function RequireAuth({ children }) {
+  const { user } = useAuthStore();
+  if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -45,6 +54,9 @@ export default function App() {
       <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/set-password" element={
+          <RequireAuth><SetPasswordPage /></RequireAuth>
+        } />
         <Route path="/dashboard" element={
           <PrivateRoute allowedRoles={["player"]}>
             <DashboardPage />

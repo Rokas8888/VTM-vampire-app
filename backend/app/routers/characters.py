@@ -19,7 +19,7 @@ from app.schemas.character import (
     DraftSaveRequest, DraftResponse, CharacterOut, CharacterSummaryOut, DirectoryCharOut,
     Step1Data, Step2Data, Step3Data, Step4Data, Step5Data,
     Step6Data, Step7Data, Step8Data, Step9Data, Step10Data,
-    CharacterUpdateRequest, XPGrantRequest, XPSpendRequest,
+    CharacterUpdateRequest, GMStatAdjustRequest, XPGrantRequest, XPSpendRequest,
     WeaponIn, PossessionIn, ImproveRequest, SessionUpdateRequest,
     MeritAddRequest, FlawAddRequest, BackgroundAddRequest,
     ConvictionAddRequest, TenetAddRequest, TempDotsRequest,
@@ -398,6 +398,43 @@ def save_session(
         char.willpower_superficial = max(0, min(char.willpower, body.willpower_superficial))
     if body.willpower_aggravated is not None:
         char.willpower_aggravated = max(0, min(char.willpower, body.willpower_aggravated))
+
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+# ── GM Stat Adjust ────────────────────────────────────────────────────────────
+
+@router.put("/{character_id}/gm-adjust", response_model=CharacterOut)
+def gm_adjust_stats(
+    character_id: int,
+    body: GMStatAdjustRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """GM/admin endpoint to adjust permanent character stats (Humanity, Blood Potency)."""
+    if current_user.role not in (UserRole.gm, UserRole.admin):
+        raise HTTPException(status_code=403, detail="Only GMs and admins can adjust character stats.")
+
+    char = db.query(Character).filter(Character.id == character_id).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+
+    if current_user.role == UserRole.gm:
+        from app.models.group import Group, GroupMember
+        has_access = db.query(GroupMember).join(
+            Group, Group.id == GroupMember.group_id
+        ).filter(
+            Group.gm_id == current_user.id,
+            GroupMember.character_id == character_id,
+        ).first() is not None
+        if not has_access:
+            raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
+
+    if body.humanity is not None:
+        char.humanity = max(0, min(10, body.humanity))
+    if body.blood_potency is not None:
+        char.blood_potency = max(0, min(5, body.blood_potency))
 
     db.commit()
     return load_full_character(char.id, db)

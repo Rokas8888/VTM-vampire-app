@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, Suspense, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
+import { useGLTF, OrbitControls, Environment, Text } from "@react-three/drei";
 import api from "../../services/api";
 import { useToast } from "../../store/toastStore";
 
@@ -231,6 +231,8 @@ const STAIR_URLS = new Set(Object.values(ASSET_CATEGORIES.Stairs));
 // Selecting any asset in these categories auto-switches to Draw Walls mode
 const WALL_CATS = new Set(["Walls", "Doors"]);
 
+const TOKEN_COLORS = ["#DC143C","#4169E1","#228B22","#FF8C00","#9400D3","#008B8B","#FF69B4","#DAA520","#20B2AA","#B8860B"];
+
 const PANEL_CATEGORIES = ASSET_CATEGORIES;
 
 const mkCell  = () => ({ floor: null, walls: { h: null, v: null }, object: null });
@@ -390,6 +392,41 @@ function EdgePreview({ previewEdges, hoveredEdge }) {
   );
 }
 
+// ── character token ───────────────────────────────────────────────────────────
+function TokenMesh({ x, z, color, name }) {
+  const short = name.length > 9 ? name.substring(0, 9) : name;
+  return (
+    <group position={[x, 0.04, z]}>
+      <mesh>
+        <cylinderGeometry args={[TILE * 0.35, TILE * 0.35, 0.006, 16]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+      </mesh>
+      <Text position={[0, 0.008, 0]} fontSize={0.008} color="white" anchorX="center" anchorY="middle" maxWidth={TILE * 0.7}>
+        {short}
+      </Text>
+    </group>
+  );
+}
+
+function Tokens({ characters, tokens }) {
+  return (
+    <>
+      {characters.map((ch, i) => {
+        const pos = tokens[ch.id];
+        if (!pos) return null;
+        return (
+          <TokenMesh key={ch.id}
+            x={(pos.col + 0.5) * TILE - HALF}
+            z={(pos.row + 0.5) * TILE - HALF}
+            color={TOKEN_COLORS[i % TOKEN_COLORS.length]}
+            name={ch.name}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 // ── hit plane ─────────────────────────────────────────────────────────────────
 function HitPlane({ x, z, idx, onDown, onDelete, onEnter, onHover, highlighted }) {
   const [hov, setHov] = useState(false);
@@ -444,7 +481,7 @@ function AtmosphereLights({ fogDensity, hour }) {
 }
 
 // ── full scene ────────────────────────────────────────────────────────────────
-function Scene({ grid, hEdges, vEdges, previewEdges, hoveredEdge, onDown, onDelete, onEnter, onHover, ghost, highlightCells, hdri, fogDensity, hour }) {
+function Scene({ grid, hEdges, vEdges, previewEdges, hoveredEdge, onDown, onDelete, onEnter, onHover, ghost, ghostToken, tokens, characters, highlightCells, hdri, fogDensity, hour }) {
   return (
     <>
       <fogExp2 attach="fog" color={0x0a0608} density={fogDensity} />
@@ -470,7 +507,9 @@ function Scene({ grid, hEdges, vEdges, previewEdges, hoveredEdge, onDown, onDele
       })}
       <EdgeWalls hEdges={hEdges} vEdges={vEdges} />
       <EdgePreview previewEdges={previewEdges} hoveredEdge={hoveredEdge} />
+      <Tokens characters={characters} tokens={tokens} />
       {ghost}
+      {ghostToken}
     </>
   );
 }
@@ -498,11 +537,15 @@ export default function SceneMap3D() {
   const [sceneName,      setSceneName]      = useState("Untitled Scene");
   const [saving,         setSaving]         = useState(false);
   const [editingName,    setEditingName]    = useState(false);
+  const [characters,     setCharacters]     = useState([]);
+  const [tokens,         setTokens]         = useState({});
+  const [heldToken,      setHeldToken]      = useState(null);
 
   // gridRef mirrors grid state so refs (undo stacks etc.) always see current value
   const gridRef        = useRef(grid);
   const hEdgesRef      = useRef(new Array(812).fill(null));
   const vEdgesRef      = useRef(new Array(812).fill(null));
+  const tokensRef      = useRef({});
   const undoStack      = useRef([]);
   const redoStack      = useRef([]);
   const autoSaveTimer  = useRef(null);
@@ -538,6 +581,11 @@ export default function SceneMap3D() {
   const applyVEdges = useCallback((arr) => {
     vEdgesRef.current = arr;
     setVEdges(arr);
+  }, []);
+
+  const applyTokens = useCallback((t) => {
+    tokensRef.current = t;
+    setTokens(t);
   }, []);
 
   // ── undo / redo ────────────────────────────────────────────────────────────
@@ -610,7 +658,7 @@ export default function SceneMap3D() {
 
   const hourLabel = `${String(Math.floor(hour)).padStart(2, "0")}:00`;
 
-  // ── fetch scene on mount ───────────────────────────────────────────────────
+  // ── fetch scene + characters on mount ─────────────────────────────────────
   useEffect(() => {
     if (!groupId) return;
     api.get(`/api/scenes/${groupId}`)
@@ -629,7 +677,17 @@ export default function SceneMap3D() {
             const v = d.vEdges.map(v => v === true ? DEFAULT_WALL_URL : (v || null));
             vEdgesRef.current = v; setVEdges(v);
           }
+          if (d.tokens && typeof d.tokens === "object") {
+            tokensRef.current = d.tokens;
+            setTokens(d.tokens);
+          }
         }
+      })
+      .catch(() => {});
+    api.get(`/api/groups/${groupId}`)
+      .then(res => {
+        const chars = (res.data.members || []).flatMap(m => m.characters || []);
+        setCharacters(chars);
       })
       .catch(() => {});
   }, [groupId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -639,7 +697,7 @@ export default function SceneMap3D() {
     if (!groupId) return;
     clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
-      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current };
+      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current, tokens: tokensRef.current };
       const current  = JSON.stringify(saveData);
       if (current === lastSavedGrid.current) return;
       try {
@@ -650,7 +708,7 @@ export default function SceneMap3D() {
       }
     }, 30000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [grid, hEdges, vEdges, groupId, sceneName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [grid, hEdges, vEdges, tokens, groupId, sceneName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── paint / erase ──────────────────────────────────────────────────────────
   const paintCell = (idx) => {
@@ -746,6 +804,19 @@ export default function SceneMap3D() {
       setHighlightCells(new Set([idx]));
       return;
     }
+    const col = idx % GRID, row = Math.floor(idx / GRID);
+    // If holding a token, place it
+    if (heldToken) {
+      applyTokens({ ...tokensRef.current, [heldToken]: { col, row } });
+      setHeldToken(null);
+      return;
+    }
+    // Check if clicking a cell with a token (pick it up)
+    const charOnCell = characters.find(ch => tokensRef.current[ch.id]?.col === col && tokensRef.current[ch.id]?.row === row);
+    if (charOnCell) {
+      setHeldToken(charOnCell.id);
+      return;
+    }
     pushHistory();
     if (tool === "erase") { eraseCell(idx); return; }
     if (tool === "wall") {
@@ -758,7 +829,7 @@ export default function SceneMap3D() {
       return;
     }
     dragging.current  = true;
-    dragStart.current = { col: idx % GRID, row: Math.floor(idx / GRID), idx };
+    dragStart.current = { col, row, idx };
     paintCell(idx);
   };
 
@@ -809,6 +880,14 @@ export default function SceneMap3D() {
   };
 
   const handleDelete = (e, idx) => {
+    const col = idx % GRID, row = Math.floor(idx / GRID);
+    const charOnCell = characters.find(ch => tokensRef.current[ch.id]?.col === col && tokensRef.current[ch.id]?.row === row);
+    if (charOnCell) {
+      const next = { ...tokensRef.current };
+      delete next[charOnCell.id];
+      applyTokens(next);
+      return;
+    }
     if (tool === "wall") {
       const edge = snapToEdge(e.point, idx);
       if (!edge) return;
@@ -840,6 +919,7 @@ export default function SceneMap3D() {
 
     const onKey = (e) => {
       if (e.target.tagName === "INPUT") return;
+      if (e.key === "Escape") { setHeldToken(null); }
       if (e.key === "r" || e.key === "R") {
         setBrushRotation(prev => {
           const steps = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
@@ -864,7 +944,7 @@ export default function SceneMap3D() {
     if (!groupId) { toast.error("No group ID — open Scene Maker from your GM dashboard."); return; }
     setSaving(true);
     try {
-      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current };
+      const saveData = { grid: gridRef.current, hEdges: hEdgesRef.current, vEdges: vEdgesRef.current, tokens: tokensRef.current };
       await api.put(`/api/scenes/${groupId}`, { name: sceneName, data: saveData });
       lastSavedGrid.current = JSON.stringify(saveData);
       toast.success("Scene saved.");
@@ -898,6 +978,24 @@ export default function SceneMap3D() {
       </Suspense>
     );
   }, [tool, activeUrl, hoveredIdx, brushRotation]);
+
+  // ── ghost token (held token preview) ──────────────────────────────────────
+  const ghostToken = useMemo(() => {
+    if (!heldToken || hoveredIdx === null) return null;
+    const charIdx = characters.findIndex(ch => ch.id === heldToken);
+    if (charIdx === -1) return null;
+    const color = TOKEN_COLORS[charIdx % TOKEN_COLORS.length];
+    const col = hoveredIdx % GRID, row = Math.floor(hoveredIdx / GRID);
+    const x = (col + 0.5) * TILE - HALF, z = (row + 0.5) * TILE - HALF;
+    return (
+      <group position={[x, 0.04, z]}>
+        <mesh>
+          <cylinderGeometry args={[TILE * 0.35, TILE * 0.35, 0.006, 16]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} transparent opacity={0.75} />
+        </mesh>
+      </group>
+    );
+  }, [heldToken, hoveredIdx, characters]);
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
@@ -972,8 +1070,35 @@ export default function SceneMap3D() {
         </span>
       </div>
 
-      {/* ── LEFT PANEL — Assets ── */}
+      {/* ── LEFT PANEL — Characters + Assets ── */}
       <aside style={{ gridArea: "left", borderRight: "1px solid #2a2a2a", background: "#0a0a0a", overflowY: "auto", overflowX: "hidden" }}>
+
+        {/* Characters / Tokens */}
+        {characters.length > 0 && (
+          <div className="px-3 py-3 border-b border-void-border">
+            <div className="font-gothic text-blood text-xs tracking-widest uppercase mb-2">Tokens</div>
+            {characters.map((ch, i) => {
+              const color = TOKEN_COLORS[i % TOKEN_COLORS.length];
+              const isPlaced = !!tokens[ch.id];
+              const isHeld = heldToken === ch.id;
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => setHeldToken(isHeld ? null : ch.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1 mb-0.5 rounded text-xs transition-colors ${
+                    isHeld ? "bg-void-mid border border-blood" : "hover:bg-void-light"
+                  }`}
+                  title={isHeld ? "Click map to place · click here to cancel" : isPlaced ? "Left-click to pick up from map" : "Click to pick up token"}
+                >
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block", opacity: isPlaced ? 1 : 0.35 }} />
+                  <span className={`truncate ${isHeld ? "text-blood" : isPlaced ? "text-gray-300" : "text-gray-500"}`}>{ch.name}</span>
+                  {isHeld && <span className="ml-auto text-blood text-xs">✦</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="px-3 py-3 border-b border-void-border sticky top-0 bg-void z-10">
           <div className="font-gothic text-blood text-xs tracking-widest uppercase mb-2">Assets</div>
           <div className="relative">
@@ -1046,6 +1171,9 @@ export default function SceneMap3D() {
               onEnter={handleEnter}
               onHover={handleHover}
               ghost={ghostElement}
+              ghostToken={ghostToken}
+              tokens={tokens}
+              characters={characters}
               highlightCells={highlightCells}
               hdri={hdri}
               fogDensity={fogDensity}

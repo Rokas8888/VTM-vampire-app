@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import ConditionManager from "../components/gm/ConditionManager";
@@ -165,14 +165,22 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer,
+  manageMode, isActive, onActivate, statOverrides, onStatChange }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
 
   return (
     <div
-      className="border border-void-border rounded-lg p-4 flex flex-col gap-4 hover:border-blood/40 transition-colors"
+      onClick={manageMode && !isActive ? onActivate : undefined}
+      className={`border rounded-lg p-4 flex flex-col gap-4 transition-colors ${
+        manageMode && !isActive
+          ? "opacity-50 border-void-border cursor-pointer hover:opacity-70"
+          : isActive
+          ? "border-blood opacity-100"
+          : "border-void-border hover:border-blood/40"
+      }`}
       style={clanCardStyle(char.clan_name)}
     >
 
@@ -218,18 +226,34 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
 
       {/* Blood Potency + Humanity + Hunger */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0">Blood Pot.</span>
-          <DotTracker value={char.blood_potency} max={5} variant="blood" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0">Humanity</span>
-          <DotTracker value={char.humanity} max={10} variant="blood" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0">Hunger</span>
-          <DotTracker value={char.current_hunger} max={5} variant="hunger" />
-        </div>
+        {[
+          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
+          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
+          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger" },
+        ].map(({ key, label, max, variant }) => {
+          const isManagedStat = manageMode === key;
+          const displayVal    = statOverrides[key] ?? char[key] ?? 0;
+          return (
+            <div key={key} className="flex items-center gap-2">
+              <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
+              <DotTracker value={displayVal} max={max} variant={variant} />
+              {isActive && isManagedStat && (
+                <div className="flex items-center gap-1 ml-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onStatChange(key, -1); }}
+                    disabled={displayVal <= 0}
+                    className="w-5 h-5 rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood disabled:opacity-30 text-xs leading-none transition-colors"
+                  >−</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onStatChange(key, +1); }}
+                    disabled={displayVal >= max}
+                    className="w-5 h-5 rounded border border-void-border text-gray-500 hover:text-blood hover:border-blood disabled:opacity-30 text-xs leading-none transition-colors"
+                  >+</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Health + Willpower — always 15 boxes, greyed out unused */}
@@ -371,6 +395,13 @@ export default function SessionModePage() {
   // lastRollMap: username → most recent RollOut for that player
   const [lastRollMap, setLastRollMap] = useState({});
 
+  // GM manage mode
+  const [manageMode, setManageMode]               = useState(null); // "humanity" | "blood_potency" | null
+  const [activeCard, setActiveCard]               = useState(null); // charId | null
+  const [statOverrides, setStatOverrides]         = useState({});   // { [charId]: { humanity?: number, blood_potency?: number } }
+  const [showManageDropdown, setShowManageDropdown] = useState(false);
+  const manageRef = useRef(null);
+
   // retainer modal
   const [retainerModal, setRetainerModal]     = useState(null); // full character object
   const [loadingRetainer, setLoadingRetainer] = useState(false);
@@ -391,6 +422,18 @@ export default function SessionModePage() {
       setIsGM(res.data.role === "gm" || res.data.role === "admin");
     }).catch(() => {});
   }, []);
+
+  // Close manage dropdown on outside click
+  useEffect(() => {
+    if (!showManageDropdown) return;
+    const close = (e) => {
+      if (manageRef.current && !manageRef.current.contains(e.target)) {
+        setShowManageDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showManageDropdown]);
 
   const fetchConditions = useCallback(async (charIds) => {
     const results = await Promise.allSettled(
@@ -452,6 +495,27 @@ export default function SessionModePage() {
     }).catch(() => {});
   }, []);
 
+  const handleStatChange = async (charId, stat, delta) => {
+    const card    = cards.find((c) => c.char.id === charId);
+    const current = statOverrides[charId]?.[stat] ?? card?.char[stat] ?? 0;
+    const max     = stat === "humanity" ? 10 : 5;
+    const newVal  = Math.max(0, Math.min(max, current + delta));
+
+    setStatOverrides((prev) => ({
+      ...prev,
+      [charId]: { ...prev[charId], [stat]: newVal },
+    }));
+
+    try {
+      await api.put(`/api/characters/${charId}/gm-adjust`, { [stat]: newVal });
+    } catch {
+      setStatOverrides((prev) => ({
+        ...prev,
+        [charId]: { ...prev[charId], [stat]: current },
+      }));
+    }
+  };
+
   const cards = group
     ? group.members.flatMap((m) => m.characters.map((c) => ({ char: c, player: m.username })))
     : [];
@@ -480,6 +544,37 @@ export default function SessionModePage() {
               ? `Synced ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
               : "Connecting…"}
           </span>
+          {/* Manage dropdown — GM only */}
+          {isGM && (
+            <div className="relative" ref={manageRef}>
+              <button
+                onClick={() => setShowManageDropdown((v) => !v)}
+                className="text-xs font-gothic tracking-wider text-gray-500 hover:text-blood border border-void-border hover:border-blood rounded px-3 py-1 transition-colors"
+              >
+                Manage ▾
+              </button>
+              {showManageDropdown && (
+                <div className="absolute right-0 top-full mt-1 bg-void border border-void-border rounded shadow-lg z-20 min-w-[150px]">
+                  {[
+                    { key: "humanity",      label: "Humanity" },
+                    { key: "blood_potency", label: "Blood Potency" },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setManageMode(key);
+                        setActiveCard(null);
+                        setShowManageDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-gothic text-gray-400 hover:text-blood hover:bg-void-light transition-colors first:rounded-t last:rounded-b"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={() => navigate("/gm")}
             className="text-gray-600 hover:text-gray-300 text-xs font-gothic tracking-wider transition-colors">
             ← Dashboard
@@ -489,6 +584,21 @@ export default function SessionModePage() {
 
       {error && (
         <div className="bg-blood-dark/20 border border-blood-dark rounded p-3 mb-4 text-red-300 text-sm">{error}</div>
+      )}
+
+      {/* Management mode banner */}
+      {manageMode && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blood-dark/20 border border-blood-dark/60 rounded mb-4 gap-3">
+          <span className="text-sm font-gothic text-blood">
+            ⚑ {manageMode === "humanity" ? "Humanity" : "Blood Potency"} Mode — tap a character card to adjust
+          </span>
+          <button
+            onClick={() => { setManageMode(null); setActiveCard(null); }}
+            className="text-xs font-gothic text-blood-dark hover:text-blood border border-blood-dark hover:border-blood rounded px-2 py-0.5 transition-colors shrink-0"
+          >
+            Exit
+          </button>
+        </div>
       )}
 
       {!group && !error && (
@@ -509,6 +619,11 @@ export default function SessionModePage() {
               onConditionsChange={() => refreshConditionsFor(char.id)}
               lastRoll={lastRollMap[player] ?? null}
               onOpenRetainer={openRetainer}
+              manageMode={manageMode}
+              isActive={activeCard === char.id}
+              onActivate={() => setActiveCard(char.id)}
+              statOverrides={statOverrides[char.id] ?? {}}
+              onStatChange={(stat, delta) => handleStatChange(char.id, stat, delta)}
             />
           ))}
         </div>

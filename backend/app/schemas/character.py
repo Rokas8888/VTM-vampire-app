@@ -171,6 +171,12 @@ class CharacterUpdateRequest(BaseModel):
     generation: Optional[str] = None
 
 
+class GMStatAdjustRequest(BaseModel):
+    """GM/admin adjustment of permanent character stats."""
+    humanity: Optional[int] = None
+    blood_potency: Optional[int] = None
+
+
 class XPGrantRequest(BaseModel):
     """Add experience points to a character (GM award)."""
     amount: int

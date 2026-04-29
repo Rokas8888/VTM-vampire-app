@@ -102,6 +102,15 @@ export default function AdminPage() {
     }
   };
 
+  const forceReset = async (userId) => {
+    try {
+      const res = await api.post(`/api/admin/users/${userId}/force-reset`);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? res.data : u)));
+    } catch (e) {
+      setError(e.response?.data?.detail || "Reset failed.");
+    }
+  };
+
   const handleSeed = async () => {
     setSeeding(true); setSeedMsg("");
     try {
@@ -122,6 +131,7 @@ export default function AdminPage() {
     if (type === "delete")  await deleteUser(userId);
     if (type === "role")    await updateUser(userId, { role: value });
     if (type === "active")  await updateUser(userId, { is_active: value });
+    if (type === "reset")   await forceReset(userId);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -293,22 +303,42 @@ export default function AdminPage() {
                         )}
                       </td>
 
-                      {/* Delete */}
+                      {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         {!isSelf && (
-                          <button
-                            onClick={() =>
-                              setConfirm({
-                                type: "delete",
-                                userId: u.id,
-                                label: `Permanently destroy ${u.username} and all their data?`,
-                              })
-                            }
-                            className="text-xs text-gray-600 hover:text-blood transition-colors"
-                            title="Delete user"
-                          >
-                            ✕
-                          </button>
+                          <div className="flex items-center justify-end gap-3">
+                            {u.force_password_reset && (
+                              <span className="text-xs text-amber-500 font-gothic" title="User must set a new password on next login">
+                                reset pending
+                              </span>
+                            )}
+                            <button
+                              onClick={() =>
+                                setConfirm({
+                                  type: "reset",
+                                  userId: u.id,
+                                  label: `Force ${u.username} to set a new password on next login?`,
+                                })
+                              }
+                              className="text-xs text-gray-500 hover:text-amber-400 transition-colors"
+                              title="Force password reset"
+                            >
+                              reset pwd
+                            </button>
+                            <button
+                              onClick={() =>
+                                setConfirm({
+                                  type: "delete",
+                                  userId: u.id,
+                                  label: `Permanently destroy ${u.username} and all their data?`,
+                                })
+                              }
+                              className="text-xs text-gray-600 hover:text-blood transition-colors"
+                              title="Delete user"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

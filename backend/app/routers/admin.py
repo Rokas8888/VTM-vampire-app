@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    force_password_reset: bool = False
 
     class Config:
         from_attributes = True
@@ -123,6 +124,24 @@ def delete_user(
 
     db.delete(user)
     db.commit()
+
+
+@router.post("/users/{user_id}/force-reset", response_model=UserOut)
+def force_password_reset(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Flag a user to be forced to set a new password on next login."""
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot reset your own password here.")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    user.force_password_reset = True
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.post("/seed")

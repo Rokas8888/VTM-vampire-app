@@ -30,9 +30,14 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    force_password_reset: bool = False
 
     class Config:
         from_attributes = True  # allows creating this from a SQLAlchemy model
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
 
 
 # What the client sends to get a new access token
