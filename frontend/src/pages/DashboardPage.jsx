@@ -136,8 +136,6 @@ export default function DashboardPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [sessionHunger, setSessionHunger] = useState(0);
 
-  // live session groups
-  const [myGroups, setMyGroups] = useState([]);
 
   // delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -198,9 +196,6 @@ export default function DashboardPage() {
         }));
         setRetainerParents(parents);
       })
-      .catch(() => {});
-    api.get("/api/groups/mine")
-      .then((res) => setMyGroups(res.data))
       .catch(() => {});
   }, []);
 
@@ -435,16 +430,6 @@ export default function DashboardPage() {
             <button onClick={() => navigate("/directory")} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
               Directory
             </button>
-            {myGroups.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => window.open(`/session/${g.id}`, "_blank")}
-                className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase flex items-center gap-1"
-                title={`Live session for ${g.name}`}
-              >
-                ⚔ {g.name}
-              </button>
-            ))}
             <span className="text-gray-600">{user?.username}</span>
             <button
               onClick={() => setShowHelp(true)}
