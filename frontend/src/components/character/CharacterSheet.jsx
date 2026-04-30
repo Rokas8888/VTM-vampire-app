@@ -11,11 +11,7 @@ const WEAPON_NAME_SUGGESTIONS = [
   "Fire Axe","Chainsaw","Brass Knuckles","Pistol","Revolver","Shotgun",
   "Assault Rifle","Sniper Rifle","Submachine Gun","Crossbow","Bow",
 ];
-const WEAPON_DAMAGE_SUGGESTIONS = [
-  "Strength+1 (Aggravated)","Strength+2 (Aggravated)","Strength (Aggravated)",
-  "Strength+1 (Superficial)","2 (Aggravated)","3 (Aggravated)",
-  "4 (Aggravated)","5 (Aggravated)",
-];
+const WEAPON_DAMAGE_SUGGESTIONS = ["+1", "+2", "+3", "+4", "+5"];
 const WEAPON_RANGE_SUGGESTIONS = [
   "Close","Close/Reach","Reach","Short","Medium","Long","Extreme",
 ];
