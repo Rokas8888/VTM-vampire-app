@@ -180,11 +180,12 @@ function RetainerRow({ retainer, onOpen }) {
 const GEN_LABEL = { childer: "13th", neonate: "12th", ancillae: "11th" };
 
 // ── Session card ──────────────────────────────────────────────────────────────
-function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, fullEditMode, onSaveCard }) {
+function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastRoll, onOpenRetainer, onSaveCard }) {
   const [showConditions, setShowConditions] = useState(false);
   const [expandedDisc, setExpandedDisc]     = useState(null);
   const [showRetainers, setShowRetainers]   = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [cardEditMode, setCardEditMode] = useState(false);
 
   const [ls, setLs] = useState({
     blood_potency:  char.blood_potency,
@@ -232,6 +233,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         willpower_superficial: wpTrack.filter(s => s === 1).length,
         willpower_aggravated:  wpTrack.filter(s => s === 2).length,
       });
+      setCardEditMode(false);
     } finally { setSaving(false); }
   };
 
@@ -247,7 +249,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
   return (
     <div
       className={`border rounded-lg p-4 flex flex-col gap-4 transition-colors ${
-        fullEditMode ? "border-blood/40" : "border-void-border hover:border-blood/40"
+        cardEditMode ? "border-blood/40" : "border-void-border hover:border-blood/40"
       }`}
       style={clanCardStyle(char.clan_name)}
     >
@@ -256,7 +258,25 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       <div>
         <div className="flex items-start justify-between gap-2">
           <h2 className="font-gothic text-blood text-xl leading-tight">{char.name}</h2>
-          <span className="text-gray-600 text-xs mt-0.5 shrink-0">{player}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-gray-600 text-xs mt-0.5">{player}</span>
+            {isGM && !cardEditMode && (
+              <button
+                onClick={() => setCardEditMode(true)}
+                className="text-xs font-gothic px-2 py-0.5 rounded border border-blood bg-blood-dark/20 text-blood hover:bg-blood/30 transition-colors"
+              >
+                Edit
+              </button>
+            )}
+            {isGM && cardEditMode && (
+              <button
+                onClick={() => setCardEditMode(false)}
+                className="text-xs font-gothic px-2 py-0.5 rounded border border-gray-600 text-gray-500 hover:border-blood hover:text-blood transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
         <p className="text-gray-500 text-xs mb-1">
           {char.clan_name ?? "—"} · {GEN_LABEL[char.generation] ?? "—"} Gen
@@ -305,7 +325,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
               value={ls[key] ?? 0}
               max={max}
               variant={variant}
-              onSetValue={fullEditMode && isGM ? (val) => set(key, val) : undefined}
+              onSetValue={cardEditMode && isGM ? (val) => set(key, val) : undefined}
             />
           </div>
         ))}
@@ -321,7 +341,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs text-gray-600">{label}</p>
-                {fullEditMode && isGM ? (
+                {cardEditMode && isGM ? (
                   <div className="flex items-center gap-1">
                     <Btn onClick={() => changeMax(key, ls[key] - 1, track, setTrack, clampMax)}>−</Btn>
                     <span className="text-xs text-gray-400 w-4 text-center">{ls[key]}</span>
@@ -341,8 +361,8 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
               active={ls[key]}
               superficial={char[key === "health" ? "health_superficial" : "willpower_superficial"]}
               aggravated={char[key === "health" ? "health_aggravated" : "willpower_aggravated"]}
-              track={fullEditMode && isGM ? track : undefined}
-              onBoxClick={fullEditMode && isGM ? (i) => cycleBox(setTrack, i) : undefined}
+              track={cardEditMode && isGM ? track : undefined}
+              onBoxClick={cardEditMode && isGM ? (i) => cycleBox(setTrack, i) : undefined}
             />
           </div>
         ))}
@@ -450,7 +470,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
       )}
 
       {/* Save button — shown in Full Edit mode */}
-      {fullEditMode && isGM && (
+      {cardEditMode && isGM && (
         <button
           onClick={handleSave}
           disabled={saving}
@@ -476,8 +496,6 @@ export default function SessionModePage() {
 
   // lastRollMap: username → most recent RollOut for that player
   const [lastRollMap, setLastRollMap] = useState({});
-
-  const [fullEditMode, setFullEditMode] = useState(false);
 
   // retainer modal
   const [retainerModal, setRetainerModal]     = useState(null);
@@ -597,18 +615,6 @@ export default function SessionModePage() {
               ? `Synced ${lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
               : "Connecting…"}
           </span>
-          {isGM && (
-            <button
-              onClick={() => setFullEditMode((v) => !v)}
-              className={`text-xs font-gothic tracking-wider border rounded px-3 py-1 transition-colors ${
-                fullEditMode
-                  ? "border-blood text-blood bg-blood-dark/20"
-                  : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-              }`}
-            >
-              {fullEditMode ? "✓ Full Edit" : "Full Edit"}
-            </button>
-          )}
           <button onClick={() => navigate("/gm")}
             className="text-gray-600 hover:text-gray-300 text-xs font-gothic tracking-wider transition-colors">
             ← Dashboard
@@ -618,20 +624,6 @@ export default function SessionModePage() {
 
       {error && (
         <div className="bg-blood-dark/20 border border-blood-dark rounded p-3 mb-4 text-red-300 text-sm">{error}</div>
-      )}
-
-      {fullEditMode && (
-        <div className="flex items-center justify-between px-4 py-2 bg-blood-dark/20 border border-blood-dark/60 rounded mb-4 gap-3">
-          <span className="text-sm font-gothic text-blood">
-            ⚑ Full Edit — adjust stats and damage directly on each card, then press Save
-          </span>
-          <button
-            onClick={() => setFullEditMode(false)}
-            className="text-xs font-gothic text-blood-dark hover:text-blood border border-blood-dark hover:border-blood rounded px-2 py-0.5 transition-colors shrink-0"
-          >
-            Exit
-          </button>
-        </div>
       )}
 
       {!group && !error && (
@@ -652,7 +644,6 @@ export default function SessionModePage() {
               onConditionsChange={() => refreshConditionsFor(char.id)}
               lastRoll={lastRollMap[player] ?? null}
               onOpenRetainer={openRetainer}
-              fullEditMode={fullEditMode}
               onSaveCard={isGM ? handleSaveCard : undefined}
             />
           ))}
