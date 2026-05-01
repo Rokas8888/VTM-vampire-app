@@ -186,13 +186,19 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
   const [showRetainers, setShowRetainers]   = useState(false);
   const [saving, setSaving]       = useState(false);
   const [cardEditMode, setCardEditMode] = useState(false);
+  const [showCompose, setShowCompose]     = useState(false);
+  const [msgBody, setMsgBody]             = useState("");
+  const [msgEphemeral, setMsgEphemeral]   = useState(false);
+  const [msgSending, setMsgSending]       = useState(false);
+  const [msgError, setMsgError]           = useState(null);
 
   const [ls, setLs] = useState({
-    blood_potency:  char.blood_potency,
-    humanity:       char.humanity,
-    current_hunger: char.current_hunger ?? 0,
-    health:         char.health,
-    willpower:      char.willpower,
+    blood_potency:   char.blood_potency,
+    humanity:        char.humanity,
+    humanity_stains: char.humanity_stains ?? 0,
+    current_hunger:  char.current_hunger ?? 0,
+    health:          char.health,
+    willpower:       char.willpower,
   });
   const [healthTrack, setHealthTrack] = useState(() =>
     buildCardTrack(char.health, char.health_superficial, char.health_aggravated));
@@ -201,11 +207,17 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
 
   // Re-sync when server pushes new values
   useEffect(() => {
-    setLs({ blood_potency: char.blood_potency, humanity: char.humanity,
-            current_hunger: char.current_hunger ?? 0, health: char.health, willpower: char.willpower });
+    setLs({
+      blood_potency:   char.blood_potency,
+      humanity:        char.humanity,
+      humanity_stains: char.humanity_stains ?? 0,
+      current_hunger:  char.current_hunger ?? 0,
+      health:          char.health,
+      willpower:       char.willpower,
+    });
     setHealthTrack(buildCardTrack(char.health, char.health_superficial, char.health_aggravated));
     setWpTrack(buildCardTrack(char.willpower, char.willpower_superficial, char.willpower_aggravated));
-  }, [char.blood_potency, char.humanity, char.current_hunger, char.health, char.willpower,
+  }, [char.blood_potency, char.humanity, char.humanity_stains, char.current_hunger, char.health, char.willpower,
       char.health_superficial, char.health_aggravated, char.willpower_superficial, char.willpower_aggravated]);
 
   const set = (key, val) => setLs(s => ({ ...s, [key]: val }));
@@ -237,6 +249,20 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
     } finally { setSaving(false); }
   };
 
+  const sendMessage = async () => {
+    if (!msgBody.trim()) return;
+    setMsgSending(true);
+    setMsgError(null);
+    try {
+      await api.post("/api/messages", { character_id: char.id, body: msgBody.trim(), ephemeral: msgEphemeral });
+      setMsgBody("");
+      setMsgEphemeral(false);
+      setShowCompose(false);
+    } catch (err) {
+      setMsgError(err.response?.data?.detail || "Failed to send — check console.");
+    } finally { setMsgSending(false); }
+  };
+
   // Small +/− button used inside the card edit controls
   const Btn = ({ onClick, children, disabled }) => (
     <button
@@ -261,12 +287,19 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-gray-600 text-xs mt-0.5">{player}</span>
             {isGM && !cardEditMode && (
-              <button
-                onClick={() => setCardEditMode(true)}
-                className="text-xs font-gothic px-2 py-0.5 rounded border border-blood bg-blood-dark/20 text-blood hover:bg-blood/30 transition-colors"
-              >
-                Edit
-              </button>
+              <>
+                <button
+                  onClick={() => { setShowCompose((v) => !v); setMsgError(null); }}
+                  className="text-xs font-gothic px-2 py-0.5 rounded border border-gray-600 text-gray-500 hover:border-blood hover:text-blood transition-colors"
+                  title="Send secret message"
+                >✉</button>
+                <button
+                  onClick={() => setCardEditMode(true)}
+                  className="text-xs font-gothic px-2 py-0.5 rounded border border-blood bg-blood-dark/20 text-blood hover:bg-blood/30 transition-colors"
+                >
+                  Edit
+                </button>
+              </>
             )}
             {isGM && cardEditMode && (
               <button
@@ -302,6 +335,45 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
             />
           </div>
         )}
+
+        {/* GM compose panel */}
+        {isGM && showCompose && (
+          <div className="mt-2 border-t border-void-border/40 pt-2 space-y-2">
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-gothic">Secret Message → {player}</p>
+              <textarea
+                className="w-full bg-void-light border border-void-border rounded px-2 py-1.5 text-xs text-gray-200 resize-none focus:outline-none focus:border-blood transition-colors"
+                rows={3}
+                placeholder="Your secret message…"
+                value={msgBody}
+                onChange={(e) => setMsgBody(e.target.value)}
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <label
+                  className="flex items-center gap-1.5 cursor-pointer select-none"
+                  onClick={() => setMsgEphemeral((v) => !v)}
+                >
+                  <div className={`w-7 h-3.5 rounded-full relative transition-colors ${msgEphemeral ? "bg-amber-700" : "bg-gray-700"}`}>
+                    <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform ${msgEphemeral ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                  </div>
+                  <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                    {msgEphemeral ? "Disappears in 15 min" : "Permanent"}
+                  </span>
+                </label>
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={sendMessage}
+                    disabled={msgSending || !msgBody.trim()}
+                    className="py-1 px-3 rounded border border-blood bg-blood-dark/20 text-blood text-xs font-gothic hover:bg-blood/30 transition-colors disabled:opacity-40"
+                  >{msgSending ? "Sending…" : "Send"}</button>
+                  <button
+                    onClick={() => { setShowCompose(false); setMsgBody(""); setMsgEphemeral(false); setMsgError(null); }}
+                    className="py-1 px-2 rounded border border-gray-700 text-gray-500 text-xs hover:border-blood hover:text-blood transition-colors"
+                  >Cancel</button>
+                </div>
+              </div>
+              {msgError && <p className="text-blood text-[10px] mt-1">{msgError}</p>}
+          </div>
+        )}
       </div>
 
       {/* Last Roll — always visible when GM */}
@@ -312,12 +384,11 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
       )}
 
-      {/* Blood Potency + Humanity + Hunger */}
+      {/* Blood Potency + Humanity + Stains + Hunger */}
       <div className="flex flex-col gap-1.5">
         {[
           { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
           { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
-          { key: "current_hunger",label: "Hunger",     max: 5,  variant: "hunger" },
         ].map(({ key, label, max, variant }) => (
           <div key={key} className="flex items-center gap-2">
             <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
@@ -329,6 +400,36 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
             />
           </div>
         ))}
+
+        {/* Stains row — always visible, editable by GM in edit mode */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 w-16 shrink-0">Stains</span>
+          <div className="flex gap-1 flex-wrap">
+            {Array.from({ length: 10 }, (_, i) => (
+              <div
+                key={i}
+                onClick={cardEditMode && isGM
+                  ? () => set("humanity_stains", i + 1 === ls.humanity_stains ? i : i + 1)
+                  : undefined}
+                className={`w-4 h-4 rounded-full border ${
+                  i < ls.humanity_stains
+                    ? "bg-red-700 border-red-700"
+                    : "border-gray-700"
+                } ${cardEditMode && isGM ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 w-16 shrink-0">Hunger</span>
+          <DotTracker
+            value={ls.current_hunger ?? 0}
+            max={5}
+            variant="hunger"
+            onSetValue={cardEditMode && isGM ? (val) => set("current_hunger", val) : undefined}
+          />
+        </div>
       </div>
 
       {/* Health + Willpower */}

@@ -508,6 +508,13 @@ export default function GMDashboardPage() {
   const [deleteText, setDeleteText]     = useState("");
   const [deleting, setDeleting]         = useState(false);
 
+  // Compose message from overlay
+  const [composeOpen, setComposeOpen]           = useState(false);
+  const [composeBody, setComposeBody]           = useState("");
+  const [composeEphemeral, setComposeEphemeral] = useState(false);
+  const [composeSending, setComposeSending]     = useState(false);
+  const [composeError, setComposeError]         = useState(null);
+
   // ── Load groups ─────────────────────────────────────────────────────────
   useEffect(() => {
     api.get("/api/groups")
@@ -616,6 +623,36 @@ export default function GMDashboardPage() {
         g.id === selectedGroup.id ? { ...g, member_count: res.data.members.length } : g
       ));
     } catch { /* ignore */ }
+  };
+
+  // ── Send message from overlay ─────────────────────────────────────────────
+  const sendGMMessage = async () => {
+    if (!viewChar || !composeBody.trim()) return;
+    setComposeSending(true);
+    setComposeError(null);
+    try {
+      await api.post("/api/messages", {
+        character_id: viewChar.id,
+        body: composeBody.trim(),
+        ephemeral: composeEphemeral,
+      });
+      setComposeBody("");
+      setComposeOpen(false);
+    } catch (err) {
+      setComposeError(err.response?.data?.detail || "Failed to send message.");
+    } finally {
+      setComposeSending(false);
+    }
+  };
+
+  const closeOverlay = () => {
+    setViewChar(null);
+    setManageMode(false);
+    setGmHasChanges(false);
+    setComposeOpen(false);
+    setComposeBody("");
+    setComposeEphemeral(false);
+    setComposeError(null);
   };
 
   // ── Open character sheet ───────────────────────────────────────────────────
@@ -1010,25 +1047,79 @@ export default function GMDashboardPage() {
             </span>
             <div className="flex items-center gap-3">
               {!loadingChar && (
-                <button
-                  onClick={() => setManageMode((v) => !v)}
-                  className={`text-xs font-gothic tracking-wider border rounded px-3 py-1.5 transition-colors ${
-                    manageMode
-                      ? "border-blood text-blood bg-blood-dark/20"
-                      : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-                  }`}
-                >
-                  {manageMode ? "✓ Managing" : "Manage"}
-                </button>
+                <>
+                  <button
+                    onClick={() => { setComposeOpen((v) => !v); setComposeError(null); }}
+                    className={`text-xs font-gothic tracking-wider border rounded px-3 py-1.5 transition-colors ${
+                      composeOpen
+                        ? "border-amber-600 text-amber-500 bg-amber-900/20"
+                        : "border-void-border text-gray-500 hover:border-amber-600 hover:text-amber-500"
+                    }`}
+                  >
+                    ✉ Message
+                  </button>
+                  <button
+                    onClick={() => setManageMode((v) => !v)}
+                    className={`text-xs font-gothic tracking-wider border rounded px-3 py-1.5 transition-colors ${
+                      manageMode
+                        ? "border-blood text-blood bg-blood-dark/20"
+                        : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                    }`}
+                  >
+                    {manageMode ? "✓ Managing" : "Manage"}
+                  </button>
+                </>
               )}
               <button
-                onClick={() => { setViewChar(null); setManageMode(false); setGmHasChanges(false); }}
+                onClick={closeOverlay}
                 className="text-sm font-gothic tracking-wider bg-green-900/40 hover:bg-green-800/60 border border-green-700 text-green-400 rounded px-4 py-1.5 transition-colors"
               >
                 ✓ Save & Close
               </button>
             </div>
           </div>
+
+          {/* Compose message panel */}
+          {composeOpen && viewChar && (
+            <div className="px-6 py-4 bg-void border-b border-amber-900/40 shrink-0">
+              <p className="text-xs text-amber-700 font-gothic tracking-wider uppercase mb-3">
+                Send Secret Message to {viewChar.name}
+              </p>
+              <div className="flex items-start gap-3 max-w-2xl">
+                <textarea
+                  className="vtm-input flex-1 text-sm resize-none"
+                  rows={2}
+                  placeholder="Write your message…"
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) sendGMMessage(); }}
+                  autoFocus
+                />
+                <div className="flex flex-col gap-2 shrink-0">
+                  <label
+                    className="flex items-center gap-2 cursor-pointer select-none"
+                    onClick={() => setComposeEphemeral((v) => !v)}
+                  >
+                    <div className={`w-8 h-4 rounded-full relative transition-colors ${composeEphemeral ? "bg-amber-700" : "bg-gray-700"}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${composeEphemeral ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </div>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                      {composeEphemeral ? "Disappears in 15 min" : "Permanent"}
+                    </span>
+                  </label>
+                  <button
+                    onClick={sendGMMessage}
+                    disabled={composeSending || !composeBody.trim()}
+                    className="vtm-btn text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {composeSending ? "Sending…" : "Send ✉"}
+                  </button>
+                </div>
+              </div>
+              {composeError && <p className="text-blood text-xs mt-2">{composeError}</p>}
+            </div>
+          )}
+
           {manageMode && (
             <div className="px-6 py-2 bg-blood-dark/10 border-b border-blood-dark/30 shrink-0">
               <p className="text-xs text-blood/70 font-gothic tracking-wider">
@@ -1041,11 +1132,15 @@ export default function GMDashboardPage() {
               <Spinner text="Opening the coffin…" />
             ) : (
               <>
+                <div className="max-w-2xl mx-auto mb-6 border-b border-void-border pb-6">
+                  <ConditionManager
+                    characterId={viewChar?.id}
+                    characterName={viewChar?.name}
+                  />
+                </div>
                 <CharacterSheet
                   character={viewChar}
                   freeEdit={manageMode}
-                  onImprove={manageMode ? gmImprove : undefined}
-                  onUnimprove={manageMode ? gmUnimprove : undefined}
                   onCharacterUpdate={(updated) => { setViewChar(updated); setGmHasChanges(true); }}
                   onAddWeapon={manageMode ? async (w) => { const res = await api.post(`/api/characters/${viewChar.id}/weapons`, w); setViewChar(res.data); setGmHasChanges(true); } : undefined}
                   onDeleteWeapon={manageMode ? async (id) => { const res = await api.delete(`/api/characters/${viewChar.id}/weapons/${id}`); setViewChar(res.data); setGmHasChanges(true); } : undefined}
@@ -1055,12 +1150,6 @@ export default function GMDashboardPage() {
                   onDeleteSpecialty={manageMode ? async (skillName, specialtyName) => { const res = await api.delete(`/api/characters/${viewChar.id}/specialties`, { params: { skill_name: skillName, specialty_name: specialtyName } }); setViewChar(res.data); setGmHasChanges(true); } : undefined}
                   onClaimFreePower={async (powerId) => { try { const res = await api.post(`/api/characters/${viewChar.id}/claim-predator-power`, { power_id: powerId }); setViewChar(res.data); setGmHasChanges(true); } catch {} }}
                 />
-                <div className="max-w-2xl mx-auto mt-6 border-t border-void-border pt-6">
-                  <ConditionManager
-                    characterId={viewChar?.id}
-                    characterName={viewChar?.name}
-                  />
-                </div>
               </>
             )}
           </div>

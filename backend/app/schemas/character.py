@@ -174,6 +174,7 @@ class CharacterUpdateRequest(BaseModel):
 class GMStatAdjustRequest(BaseModel):
     """GM/admin adjustment of permanent and session character stats."""
     humanity: Optional[int] = None
+    humanity_stains: Optional[int] = None
     blood_potency: Optional[int] = None
     health: Optional[int] = None
     willpower: Optional[int] = None
@@ -426,6 +427,7 @@ class CharacterOut(BaseModel):
     clan: Optional[ClanOut]
     predator_type: Optional[PredatorTypeOut]
     humanity: int
+    humanity_stains: int = 0
     generation: Optional[Generation]
     blood_potency: int
     health: int

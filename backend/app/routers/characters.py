@@ -449,6 +449,8 @@ def gm_adjust_stats(
         char.willpower_superficial = max(0, min(char.willpower, body.willpower_superficial))
     if body.willpower_aggravated is not None:
         char.willpower_aggravated = max(0, min(char.willpower, body.willpower_aggravated))
+    if body.humanity_stains is not None:
+        char.humanity_stains = max(0, min(10, body.humanity_stains))
 
     db.commit()
     return load_full_character(char.id, db)

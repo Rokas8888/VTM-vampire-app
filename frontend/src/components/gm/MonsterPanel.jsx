@@ -43,7 +43,6 @@ const DEFAULT_FORM = {
   strength: 1, dexterity: 1, stamina: 1,
   charisma: 1, manipulation: 1, composure: 1,
   intelligence: 1, wits: 1, resolve: 1,
-  attack_pool: 0, attack_damage_type: "superficial",
   weapons: [], custom_skills: [], disciplines: [],
   special_abilities: "", notes: "",
 };
@@ -433,9 +432,11 @@ function DisciplinesSection({ disciplines, onChange }) {
 
 // ── Inline monster editor (expanded card) ────────────────────────────────────
 
-function MonsterEditor({ monster, onSave, onDelete, saving }) {
+function MonsterEditor({ monster, onSave, onDelete, saving, onPortraitChange }) {
   const [form,  setForm]  = useState({ ...monster });
   const [dirty, setDirty] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [portrait, setPortrait] = useState(monster.portrait_url ?? null);
 
   const set = (key, value) => { setForm((f) => ({ ...f, [key]: value })); setDirty(true); };
   const setJson = (key, value) => { setForm((f) => ({ ...f, [key]: value })); setDirty(true); };
@@ -444,11 +445,64 @@ function MonsterEditor({ monster, onSave, onDelete, saving }) {
     setDirty(true);
   };
 
+  const handlePortraitUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    setUploading(true);
+    try {
+      const res = await api.post(`/api/portraits/monster/${monster.id}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setPortrait(res.data.portrait_url);
+      onPortraitChange?.(monster.id, res.data.portrait_url);
+    } catch { /* ignore */ }
+    finally { setUploading(false); }
+  };
+
+  const handlePortraitDelete = async () => {
+    setUploading(true);
+    try {
+      await api.delete(`/api/portraits/monster/${monster.id}`);
+      setPortrait(null);
+      onPortraitChange?.(monster.id, null);
+    } catch { /* ignore */ }
+    finally { setUploading(false); }
+  };
+
   const showHunger = form.type === "vampire" || form.type === "ghoul";
   const showDisc   = form.type === "vampire" || form.type === "ghoul";
 
   return (
     <div className="px-4 pb-4 pt-3 border-t border-void-border/40 space-y-5">
+
+      {/* Portrait upload */}
+      <div className="flex items-start gap-4">
+        {portrait ? (
+          <div className="relative shrink-0">
+            <img
+              src={portrait}
+              alt="Monster portrait"
+              className="w-20 h-20 object-cover rounded border border-void-border"
+            />
+            <button
+              type="button"
+              onClick={handlePortraitDelete}
+              disabled={uploading}
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-void-light border border-void-border text-gray-500 hover:border-blood hover:text-blood text-xs leading-none flex items-center justify-center transition-colors"
+              title="Remove portrait"
+            >✕</button>
+          </div>
+        ) : (
+          <label className={`shrink-0 w-20 h-20 flex flex-col items-center justify-center rounded border border-dashed border-void-border text-gray-700 hover:border-blood hover:text-blood transition-colors cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+            <span className="text-xl leading-none mb-1">+</span>
+            <span className="text-[9px] uppercase tracking-wider font-gothic">Portrait</span>
+            <input type="file" accept="image/*" className="hidden" onChange={handlePortraitUpload} />
+          </label>
+        )}
+        {uploading && <span className="text-xs text-gray-600 animate-pulse self-center">Uploading…</span>}
+      </div>
 
       {/* Name + type */}
       <div className="flex gap-3 flex-wrap">
@@ -510,25 +564,6 @@ function MonsterEditor({ monster, onSave, onDelete, saving }) {
         onChange={(v) => setJson("custom_skills", v)}
       />
 
-      {/* Attack */}
-      <div>
-        <p className="vtm-label mb-2">Attack</p>
-        <div className="flex gap-5 items-center flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Pool</span>
-            <Stepper value={form.attack_pool} min={0} max={20} onChange={(v) => set("attack_pool", v)} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Damage</span>
-            <select className="vtm-input py-1 text-sm" value={form.attack_damage_type}
-              onChange={(e) => set("attack_damage_type", e.target.value)}>
-              <option value="superficial">Superficial</option>
-              <option value="aggravated">Aggravated</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Weapons */}
       <WeaponsSection weapons={form.weapons} onChange={(v) => setJson("weapons", v)} />
 
@@ -570,7 +605,7 @@ function MonsterEditor({ monster, onSave, onDelete, saving }) {
 
 // ── Monster card (collapsed + expanded editor) ────────────────────────────────
 
-function MonsterCard({ monster, onSave, onDelete, saving }) {
+function MonsterCard({ monster, onSave, onDelete, saving, onPortraitChange }) {
   const [expanded, setExpanded] = useState(false);
   const typeStyle  = TYPE_COLORS[monster.type] ?? TYPE_COLORS.other;
   const showHunger = monster.type === "vampire" || monster.type === "ghoul";
@@ -620,6 +655,7 @@ function MonsterCard({ monster, onSave, onDelete, saving }) {
           onSave={onSave}
           onDelete={onDelete}
           saving={saving === monster.id}
+          onPortraitChange={onPortraitChange}
         />
       )}
     </div>
@@ -713,25 +749,6 @@ function CreateForm({ groupId, onCreated, onCancel }) {
       {/* Skills */}
       <SkillsSection skills={form.custom_skills} onChange={(v) => setJson("custom_skills", v)} />
 
-      {/* Attack */}
-      <div>
-        <p className="vtm-label mb-2">Attack</p>
-        <div className="flex gap-5 items-center flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Pool</span>
-            <Stepper value={form.attack_pool} min={0} max={20} onChange={(v) => set("attack_pool", v)} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Damage</span>
-            <select className="vtm-input py-1 text-sm" value={form.attack_damage_type}
-              onChange={(e) => set("attack_damage_type", e.target.value)}>
-              <option value="superficial">Superficial</option>
-              <option value="aggravated">Aggravated</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Weapons */}
       <WeaponsSection weapons={form.weapons} onChange={(v) => setJson("weapons", v)} />
 
@@ -786,6 +803,10 @@ export default function MonsterPanel({ groupId }) {
 
   const handleCreated = (m) => { setMonsters((p) => [...p, m]); setShowCreate(false); };
 
+  const handlePortraitChange = (monsterId, url) => {
+    setMonsters((p) => p.map((m) => m.id === monsterId ? { ...m, portrait_url: url } : m));
+  };
+
   const handleSave = async (form) => {
     setSavingId(form.id);
     try {
@@ -835,7 +856,8 @@ export default function MonsterPanel({ groupId }) {
         <div className="space-y-2">
           {monsters.map((m) => (
             <MonsterCard key={m.id} monster={m} onSave={handleSave}
-              onDelete={setDeleteTarget} saving={savingId} />
+              onDelete={setDeleteTarget} saving={savingId}
+              onPortraitChange={handlePortraitChange} />
           ))}
         </div>
       )}

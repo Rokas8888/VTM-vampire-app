@@ -142,6 +142,12 @@ export default function DashboardPage() {
   const [deleteText, setDeleteText]     = useState("");
   const [deleting, setDeleting]         = useState(false);
 
+  // per-character messages
+  const [showMessages, setShowMessages]   = useState(false);
+  const [charMessages, setCharMessages]   = useState([]);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [loadingMsgs, setLoadingMsgs]     = useState(false);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const openPanel = (name) => {
     setActivePanel((prev) => (prev === name ? null : name));
@@ -157,6 +163,9 @@ export default function DashboardPage() {
     setEditMode(false);
     setXpAmount(""); setXpError(null);
     setTempMode(false);
+    setShowMessages(false);
+    setCharMessages([]);
+    setUnreadCount(0);
   };
 
   // ── Auto-open character from URL param on load ────────────────────────────
@@ -198,6 +207,56 @@ export default function DashboardPage() {
       })
       .catch(() => {});
   }, []);
+
+  // ── Poll unread count every 8s while a character is open ────────────────
+  useEffect(() => {
+    if (!selected) { setUnreadCount(0); return; }
+    const fetchUnread = () =>
+      api.get(`/api/messages/character/${selected.id}/unread-count`)
+        .then((r) => setUnreadCount(r.data.count))
+        .catch(() => {});
+    fetchUnread();
+    const iv = setInterval(fetchUnread, 8000);
+    return () => clearInterval(iv);
+  }, [selected?.id]);
+
+  // ── Poll character data every 10s so GM session changes (health, hunger) show live ──
+  useEffect(() => {
+    if (!selected) return;
+    const poll = () =>
+      api.get(`/api/characters/${selected.id}`)
+        .then((r) => setSelected(r.data))
+        .catch(() => {});
+    const iv = setInterval(poll, 10000);
+    return () => clearInterval(iv);
+  }, [selected?.id]);
+
+  const openMessages = async () => {
+    if (!selected) return;
+    setShowMessages(true);
+    setLoadingMsgs(true);
+    try {
+      const res = await api.get(`/api/messages/character/${selected.id}`);
+      setCharMessages(res.data);
+      setUnreadCount(0);
+      await api.put(`/api/messages/character/${selected.id}/read-all`);
+    } catch { /* ignore */ }
+    finally { setLoadingMsgs(false); }
+  };
+
+  // ── Poll messages every 8s while inbox is open ────────────────────────────
+  useEffect(() => {
+    if (!showMessages || !selected) return;
+    const poll = async () => {
+      try {
+        const res = await api.get(`/api/messages/character/${selected.id}`);
+        setCharMessages(res.data);
+        await api.put(`/api/messages/character/${selected.id}/read-all`);
+      } catch { /* ignore */ }
+    };
+    const iv = setInterval(poll, 8000);
+    return () => clearInterval(iv);
+  }, [showMessages, selected?.id]);
 
   const handleLogout = () => {
     if (selected) {
@@ -430,6 +489,7 @@ export default function DashboardPage() {
             <button onClick={() => navigate("/directory")} className="hover:text-blood transition-colors font-gothic tracking-wider text-xs uppercase">
               Directory
             </button>
+
             <span className="text-gray-600">{user?.username}</span>
             <button
               onClick={() => setShowHelp(true)}
@@ -519,6 +579,26 @@ export default function DashboardPage() {
             >
               Edit Ambition & Desire
             </button>
+
+            {/* Messages — hidden for retainers */}
+            {!selected.is_retainer && (
+              <button
+                onClick={openMessages}
+                className={`relative px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
+                  unreadCount > 0
+                    ? "border-blood text-blood bg-blood-dark/20 hover:bg-blood/30"
+                    : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                }`}
+                title="Secret messages from your GM"
+              >
+                ✉ Messages
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blood text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Dice Roller — far right, distinctive solid design */}
             <button
@@ -918,6 +998,70 @@ export default function DashboardPage() {
     )}
       {/* ── Help modal ── */}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {/* ── Character messages modal ── */}
+      {showMessages && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowMessages(false)}
+        >
+          <div
+            className="bg-void-light border border-void-border rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-void-border shrink-0">
+              <div>
+                <h2 className="font-gothic text-blood text-lg tracking-wider">✉ Messages</h2>
+                <p className="text-gray-600 text-xs">{selected?.name}</p>
+              </div>
+              <button onClick={() => setShowMessages(false)} className="text-gray-600 hover:text-gray-300 text-lg">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {loadingMsgs ? (
+                <p className="text-gray-600 text-sm animate-pulse font-gothic text-center py-8">Loading…</p>
+              ) : charMessages.length === 0 ? (
+                <p className="text-gray-600 text-sm italic text-center py-8">No messages for this character.</p>
+              ) : (
+                charMessages.map((msg) => {
+                  const minsLeft = msg.expires_at
+                    ? Math.max(0, Math.round((new Date(msg.expires_at) - Date.now()) / 60000))
+                    : null;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`rounded border px-4 py-3 space-y-1 ${
+                        msg.ephemeral
+                          ? "border-amber-800/40 bg-amber-950/20"
+                          : msg.is_read ? "border-void-border/40 bg-black/10" : "border-blood/30 bg-blood-dark/10"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-xs text-gray-500 font-gothic uppercase tracking-wider">
+                          From {msg.sender_username}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {msg.ephemeral && (
+                            <span className="text-[10px] text-amber-600 font-gothic">
+                              ⏳ {minsLeft > 0 ? `disappears in ${minsLeft} min` : "expiring…"}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-500">
+                            {new Date(msg.created_at).toLocaleString([], {
+                              month: "short", day: "numeric",
+                              hour: "2-digit", minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

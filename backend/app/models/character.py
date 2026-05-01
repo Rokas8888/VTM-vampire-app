@@ -36,7 +36,8 @@ class Character(Base):
     predator_type_id = Column(Integer, ForeignKey("predator_types.id"), nullable=True)
 
     # Step 9 - Humanity
-    humanity = Column(Integer, default=7)
+    humanity         = Column(Integer, default=7)
+    humanity_stains  = Column(Integer, default=0, nullable=False)
 
     # Step 10 - Generation
     generation = Column(Enum(Generation), nullable=True)

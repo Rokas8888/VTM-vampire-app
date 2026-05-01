@@ -87,6 +87,7 @@ class MonsterOut(BaseModel):
     disciplines: List[dict]
     special_abilities: str
     notes: str
+    portrait_url: Optional[str] = None
 
     class Config:
         from_attributes = True

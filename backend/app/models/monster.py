@@ -60,6 +60,9 @@ class Monster(Base):
     custom_skills = Column(JSON, default=list, nullable=False)
     disciplines   = Column(JSON, default=list, nullable=False)
 
+    # Portrait
+    portrait_url = Column(String, nullable=True)
+
     # Free-text fields
     special_abilities = Column(Text, default="")
     notes             = Column(Text, default="")
