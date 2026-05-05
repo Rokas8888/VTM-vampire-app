@@ -14,7 +14,7 @@ depends_on = None
 
 
 def upgrade():
-    op.drop_index('ix_messages_recipient_id', table_name='messages')
+    op.execute("DROP INDEX IF EXISTS ix_messages_recipient_id")
     op.drop_table('messages')
 
     op.create_table(
