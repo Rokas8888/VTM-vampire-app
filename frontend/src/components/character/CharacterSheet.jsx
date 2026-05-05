@@ -359,20 +359,7 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* 5-slot unified dot row: red filled | blue temp bonus | red excluded | grey empty */}
-          <div className="flex gap-0.5 items-center">
-            {Array.from({ length: 5 }, (_, i) => {
-              const pos  = i + 1;
-              const base = cd.level + (tempDots < 0 ? tempDots : 0);
-              if (pos <= base)
-                return <span key={i} className="text-blood text-sm leading-none">●</span>;
-              if (tempDots > 0 && pos <= cd.level + tempDots)
-                return <span key={i} className="text-blue-400 text-sm leading-none">●</span>;
-              if (tempDots < 0 && pos <= cd.level)
-                return <span key={i} className="text-red-500 text-sm leading-none">●</span>;
-              return <span key={i} className="text-gray-700 text-sm leading-none">○</span>;
-            })}
-          </div>
+          <DotRating value={cd.level} tempValue={tempDots} max={5} size="text-sm" />
           {/* Undo last dot (−) */}
           {onUnimprove && cd.level > 1 && (
             <button

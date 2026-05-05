@@ -96,6 +96,7 @@ def build_character_card(char: Character, db: Session) -> GMCharacterCard:
         generation=char.generation.value if char.generation else None,
         blood_potency=char.blood_potency,
         humanity=char.humanity,
+        humanity_stains=char.humanity_stains if char.humanity_stains is not None else 0,
         current_hunger=char.current_hunger,
         health=char.health,
         health_superficial=char.health_superficial,

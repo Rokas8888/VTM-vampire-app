@@ -26,6 +26,7 @@ class GMCharacterCard(BaseModel):
     generation: Optional[str]
     blood_potency: int
     humanity: int
+    humanity_stains: int = 0
     current_hunger: int
     health: int
     health_superficial: int

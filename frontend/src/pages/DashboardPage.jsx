@@ -147,6 +147,8 @@ export default function DashboardPage() {
   const [charMessages, setCharMessages]   = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
+  const [openedMsgId, setOpenedMsgId]     = useState(null);
+  const [msgTick, setMsgTick]             = useState(0);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const openPanel = (name) => {
@@ -166,6 +168,7 @@ export default function DashboardPage() {
     setShowMessages(false);
     setCharMessages([]);
     setUnreadCount(0);
+    setOpenedMsgId(null);
   };
 
   // ── Auto-open character from URL param on load ────────────────────────────
@@ -234,14 +237,24 @@ export default function DashboardPage() {
   const openMessages = async () => {
     if (!selected) return;
     setShowMessages(true);
+    setOpenedMsgId(null);
     setLoadingMsgs(true);
     try {
       const res = await api.get(`/api/messages/character/${selected.id}`);
       setCharMessages(res.data);
       setUnreadCount(0);
-      await api.put(`/api/messages/character/${selected.id}/read-all`);
     } catch { /* ignore */ }
     finally { setLoadingMsgs(false); }
+  };
+
+  const handleOpenMsg = async (msg) => {
+    if (openedMsgId === msg.id) { setOpenedMsgId(null); return; }
+    setOpenedMsgId(msg.id);
+    try {
+      const res = await api.put(`/api/messages/${msg.id}/open`);
+      setCharMessages((prev) => prev.map((m) => m.id === msg.id ? res.data : m));
+      setUnreadCount((c) => Math.max(0, c - (msg.is_read ? 0 : 1)));
+    } catch { /* ignore */ }
   };
 
   // ── Poll messages every 8s while inbox is open ────────────────────────────
@@ -251,12 +264,18 @@ export default function DashboardPage() {
       try {
         const res = await api.get(`/api/messages/character/${selected.id}`);
         setCharMessages(res.data);
-        await api.put(`/api/messages/character/${selected.id}/read-all`);
       } catch { /* ignore */ }
     };
     const iv = setInterval(poll, 8000);
     return () => clearInterval(iv);
   }, [showMessages, selected?.id]);
+
+  // ── Tick every second to update countdown timers ──────────────────────────
+  useEffect(() => {
+    if (!showMessages) return;
+    const iv = setInterval(() => setMsgTick((t) => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, [showMessages]);
 
   const handleLogout = () => {
     if (selected) {
@@ -1003,7 +1022,7 @@ export default function DashboardPage() {
       {showMessages && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowMessages(false)}
+          onClick={() => { setShowMessages(false); setOpenedMsgId(null); }}
         >
           <div
             className="bg-void-light border border-void-border rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
@@ -1014,46 +1033,74 @@ export default function DashboardPage() {
                 <h2 className="font-gothic text-blood text-lg tracking-wider">✉ Messages</h2>
                 <p className="text-gray-600 text-xs">{selected?.name}</p>
               </div>
-              <button onClick={() => setShowMessages(false)} className="text-gray-600 hover:text-gray-300 text-lg">✕</button>
+              <button onClick={() => { setShowMessages(false); setOpenedMsgId(null); }} className="text-gray-600 hover:text-gray-300 text-lg">✕</button>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
               {loadingMsgs ? (
                 <p className="text-gray-600 text-sm animate-pulse font-gothic text-center py-8">Loading…</p>
               ) : charMessages.length === 0 ? (
                 <p className="text-gray-600 text-sm italic text-center py-8">No messages for this character.</p>
               ) : (
                 charMessages.map((msg) => {
-                  const minsLeft = msg.expires_at
-                    ? Math.max(0, Math.round((new Date(msg.expires_at) - Date.now()) / 60000))
+                  const isOpen = openedMsgId === msg.id;
+                  const secsLeft = msg.expires_at
+                    ? Math.max(0, Math.floor((new Date(msg.expires_at) - Date.now()) / 1000))
                     : null;
+                  // msgTick forces re-render every second for countdown
+                  void msgTick;
+                  const mm = secsLeft !== null ? String(Math.floor(secsLeft / 60)).padStart(2, "0") : null;
+                  const ss = secsLeft !== null ? String(secsLeft % 60).padStart(2, "0") : null;
+
                   return (
-                    <div
-                      key={msg.id}
-                      className={`rounded border px-4 py-3 space-y-1 ${
-                        msg.ephemeral
-                          ? "border-amber-800/40 bg-amber-950/20"
-                          : msg.is_read ? "border-void-border/40 bg-black/10" : "border-blood/30 bg-blood-dark/10"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-xs text-gray-500 font-gothic uppercase tracking-wider">
-                          From {msg.sender_username}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {msg.ephemeral && (
-                            <span className="text-[10px] text-amber-600 font-gothic">
-                              ⏳ {minsLeft > 0 ? `disappears in ${minsLeft} min` : "expiring…"}
-                            </span>
+                    <div key={msg.id}>
+                      {/* ── List row — always visible ── */}
+                      <button
+                        onClick={() => handleOpenMsg(msg)}
+                        className={`w-full text-left rounded border px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${
+                          isOpen
+                            ? "border-blood/50 bg-blood-dark/20"
+                            : msg.ephemeral
+                              ? "border-amber-800/40 bg-amber-950/20 hover:border-amber-600/60"
+                              : msg.is_read
+                                ? "border-void-border/40 bg-black/10 hover:border-void-border"
+                                : "border-blood/40 bg-blood-dark/10 hover:border-blood/60"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {!msg.is_read && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blood shrink-0" />
                           )}
-                          <span className="text-[10px] text-gray-500">
-                            {new Date(msg.created_at).toLocaleString([], {
-                              month: "short", day: "numeric",
-                              hour: "2-digit", minute: "2-digit",
-                            })}
+                          <span className="font-gothic text-sm text-gray-200 truncate">
+                            {msg.subject || "Unknown"}
                           </span>
                         </div>
-                      </div>
-                      <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {msg.ephemeral && (
+                            <span className="text-[10px] text-amber-600 font-gothic">⏳</span>
+                          )}
+                          <span className="text-[10px] text-gray-600">
+                            {isOpen ? "▲" : "▼"}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* ── Detail panel — visible when opened ── */}
+                      {isOpen && (
+                        <div className={`rounded-b border-x border-b px-4 py-3 space-y-2 ${
+                          msg.ephemeral ? "border-amber-800/40 bg-amber-950/10" : "border-void-border/40 bg-black/20"
+                        }`}>
+                          <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                            <span className="font-gothic uppercase tracking-wider">From {msg.sender_username}</span>
+                            <span>{new Date(msg.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                          {msg.ephemeral && secsLeft !== null && (
+                            <p className={`text-[10px] font-gothic ${secsLeft < 60 ? "text-blood animate-pulse" : "text-amber-600"}`}>
+                              ⏳ {secsLeft > 0 ? `Disappears in ${mm}:${ss}` : "Expiring…"}
+                            </p>
+                          )}
+                          <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })

@@ -10,9 +10,11 @@ class Message(Base):
     id           = Column(Integer, primary_key=True)
     sender_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
     character_id = Column(Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=False)
+    subject      = Column(Text, nullable=True)
     body         = Column(Text, nullable=False)
     is_read      = Column(Boolean, default=False, nullable=False)
-    expires_at   = Column(DateTime(timezone=True), nullable=True)  # null = permanent
+    is_ephemeral = Column(Boolean, default=False, nullable=False)
+    expires_at   = Column(DateTime(timezone=True), nullable=True)  # set on first open if ephemeral
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     sender    = relationship("User", foreign_keys=[sender_id])

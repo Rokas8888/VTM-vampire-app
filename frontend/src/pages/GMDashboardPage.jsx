@@ -510,6 +510,7 @@ export default function GMDashboardPage() {
 
   // Compose message from overlay
   const [composeOpen, setComposeOpen]           = useState(false);
+  const [composeSubject, setComposeSubject]     = useState("");
   const [composeBody, setComposeBody]           = useState("");
   const [composeEphemeral, setComposeEphemeral] = useState(false);
   const [composeSending, setComposeSending]     = useState(false);
@@ -633,9 +634,11 @@ export default function GMDashboardPage() {
     try {
       await api.post("/api/messages", {
         character_id: viewChar.id,
+        subject: composeSubject.trim() || null,
         body: composeBody.trim(),
         ephemeral: composeEphemeral,
       });
+      setComposeSubject("");
       setComposeBody("");
       setComposeOpen(false);
     } catch (err) {
@@ -650,6 +653,7 @@ export default function GMDashboardPage() {
     setManageMode(false);
     setGmHasChanges(false);
     setComposeOpen(false);
+    setComposeSubject("");
     setComposeBody("");
     setComposeEphemeral(false);
     setComposeError(null);
@@ -1085,7 +1089,15 @@ export default function GMDashboardPage() {
               <p className="text-xs text-amber-700 font-gothic tracking-wider uppercase mb-3">
                 Send Secret Message to {viewChar.name}
               </p>
-              <div className="flex items-start gap-3 max-w-2xl">
+              <div className="flex flex-col gap-2 max-w-2xl w-full">
+                <input
+                  className="vtm-input text-sm"
+                  placeholder="Message name (optional)"
+                  value={composeSubject}
+                  onChange={(e) => setComposeSubject(e.target.value)}
+                  autoFocus
+                />
+              <div className="flex items-start gap-3">
                 <textarea
                   className="vtm-input flex-1 text-sm resize-none"
                   rows={2}
@@ -1093,7 +1105,6 @@ export default function GMDashboardPage() {
                   value={composeBody}
                   onChange={(e) => setComposeBody(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) sendGMMessage(); }}
-                  autoFocus
                 />
                 <div className="flex flex-col gap-2 shrink-0">
                   <label
@@ -1117,6 +1128,7 @@ export default function GMDashboardPage() {
                 </div>
               </div>
               {composeError && <p className="text-blood text-xs mt-2">{composeError}</p>}
+              </div>
             </div>
           )}
 

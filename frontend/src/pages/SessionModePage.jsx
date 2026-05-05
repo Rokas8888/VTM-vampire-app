@@ -187,6 +187,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
   const [saving, setSaving]       = useState(false);
   const [cardEditMode, setCardEditMode] = useState(false);
   const [showCompose, setShowCompose]     = useState(false);
+  const [msgSubject, setMsgSubject]       = useState("");
   const [msgBody, setMsgBody]             = useState("");
   const [msgEphemeral, setMsgEphemeral]   = useState(false);
   const [msgSending, setMsgSending]       = useState(false);
@@ -254,7 +255,8 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
     setMsgSending(true);
     setMsgError(null);
     try {
-      await api.post("/api/messages", { character_id: char.id, body: msgBody.trim(), ephemeral: msgEphemeral });
+      await api.post("/api/messages", { character_id: char.id, subject: msgSubject.trim() || null, body: msgBody.trim(), ephemeral: msgEphemeral });
+      setMsgSubject("");
       setMsgBody("");
       setMsgEphemeral(false);
       setShowCompose(false);
@@ -340,6 +342,12 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         {isGM && showCompose && (
           <div className="mt-2 border-t border-void-border/40 pt-2 space-y-2">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-gothic">Secret Message → {player}</p>
+              <input
+                className="w-full bg-void-light border border-void-border rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blood transition-colors"
+                placeholder="Message name (optional)"
+                value={msgSubject}
+                onChange={(e) => setMsgSubject(e.target.value)}
+              />
               <textarea
                 className="w-full bg-void-light border border-void-border rounded px-2 py-1.5 text-xs text-gray-200 resize-none focus:outline-none focus:border-blood transition-colors"
                 rows={3}
@@ -366,7 +374,7 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
                     className="py-1 px-3 rounded border border-blood bg-blood-dark/20 text-blood text-xs font-gothic hover:bg-blood/30 transition-colors disabled:opacity-40"
                   >{msgSending ? "Sending…" : "Send"}</button>
                   <button
-                    onClick={() => { setShowCompose(false); setMsgBody(""); setMsgEphemeral(false); setMsgError(null); }}
+                    onClick={() => { setShowCompose(false); setMsgSubject(""); setMsgBody(""); setMsgEphemeral(false); setMsgError(null); }}
                     className="py-1 px-2 rounded border border-gray-700 text-gray-500 text-xs hover:border-blood hover:text-blood transition-colors"
                   >Cancel</button>
                 </div>

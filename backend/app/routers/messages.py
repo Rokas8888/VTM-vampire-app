@@ -18,7 +18,7 @@ def _now() -> datetime:
 
 
 def _active_filter():
-    """Filter that excludes expired ephemeral messages."""
+    """Exclude messages whose ephemeral timer has expired."""
     now = _now()
     return or_(Message.expires_at == None, Message.expires_at > now)  # noqa: E711
 
@@ -28,9 +28,10 @@ def _to_out(msg: Message) -> MessageOut:
         id=msg.id,
         sender_id=msg.sender_id,
         sender_username=msg.sender.username,
+        subject=msg.subject,
         body=msg.body,
         is_read=msg.is_read,
-        ephemeral=msg.expires_at is not None,
+        ephemeral=msg.is_ephemeral,
         expires_at=msg.expires_at,
         created_at=msg.created_at,
     )
@@ -52,14 +53,41 @@ def send_message(
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
 
-    expires_at = _now() + timedelta(minutes=15) if body.ephemeral else None
     msg = Message(
         sender_id=current_user.id,
         character_id=body.character_id,
+        subject=body.subject.strip() if body.subject and body.subject.strip() else None,
         body=body.body.strip(),
-        expires_at=expires_at,
+        is_ephemeral=body.ephemeral,
+        # expires_at intentionally not set here — timer starts on first open
     )
     db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    return _to_out(msg)
+
+
+@router.put("/{message_id}/open", response_model=MessageOut)
+def open_message(
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Player opens a message — marks read and starts ephemeral timer on first open."""
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found.")
+
+    char = db.query(Character).filter(
+        Character.id == msg.character_id,
+        Character.user_id == current_user.id,
+    ).first()
+    if not char:
+        raise HTTPException(status_code=403, detail="Not your message.")
+
+    msg.is_read = True
+    if msg.is_ephemeral and msg.expires_at is None:
+        msg.expires_at = _now() + timedelta(minutes=15)
     db.commit()
     db.refresh(msg)
     return _to_out(msg)

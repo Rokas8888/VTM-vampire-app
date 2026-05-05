@@ -47,7 +47,32 @@ const DEFAULT_FORM = {
   special_abilities: "", notes: "",
 };
 
-const BLANK_WEAPON = { name: "", damage: "", range: "", clips: "", traits: "" };
+const BLANK_WEAPON = { name: "", damage: "", range: "", clips: "", traits: "", notes: "" };
+
+const WEAPON_NAME_SUGGESTIONS = [
+  "Combat Knife","Hunting Knife","Stake","Baseball Bat","Machete","Sword","Axe",
+  "Fire Axe","Chainsaw","Brass Knuckles","Pistol","Revolver","Shotgun",
+  "Assault Rifle","Sniper Rifle","Submachine Gun","Crossbow","Bow",
+];
+const WEAPON_DAMAGE_SUGGESTIONS = ["+1", "+2", "+3", "+4", "+5"];
+const WEAPON_RANGE_SUGGESTIONS = [
+  "Close","Close/Reach","Reach","Short","Medium","Long","Extreme",
+];
+const WEAPON_TRAITS_SUGGESTIONS = [
+  "Concealable","Loud","Messy","Piercing","Staking","Two-handed","Burst Fire","Fully Automatic","Silenced",
+];
+
+function SuggestionInput({ id, value, onChange, suggestions, placeholder, autoFocus }) {
+  return (
+    <>
+      <input list={id} className="vtm-input" value={value}
+        onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} />
+      <datalist id={id}>
+        {suggestions.map((s) => <option key={s} value={s} />)}
+      </datalist>
+    </>
+  );
+}
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -149,65 +174,120 @@ function HungerRow({ value, onChange }) {
 // ── Weapons section ───────────────────────────────────────────────────────────
 
 function WeaponsSection({ weapons, onChange }) {
-  const [adding, setAdding] = useState(false);
-  const [form,   setForm]   = useState(BLANK_WEAPON);
+  const [adding,      setAdding]      = useState(false);
+  const [form,        setForm]        = useState(BLANK_WEAPON);
+  const [weaponError, setWeaponError] = useState(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleAdd = () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) { setWeaponError("Weapon name is required."); return; }
+    setWeaponError(null);
     onChange([...weapons, { ...form, name: form.name.trim() }]);
-    setForm(BLANK_WEAPON); setAdding(false);
+    setForm(BLANK_WEAPON);
+    setAdding(false);
   };
 
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
         <p className="vtm-label">Weapons</p>
-        {!adding && <button type="button" onClick={() => setAdding(true)}
-          className="text-xs text-gray-600 hover:text-blood transition-colors">+ Add</button>}
+        {!adding && (
+          <button type="button" onClick={() => setAdding(true)}
+            className="text-xs text-gray-600 hover:text-blood transition-colors font-gothic tracking-wider">
+            + Add Weapon
+          </button>
+        )}
       </div>
 
+      {weapons.length === 0 && !adding && (
+        <p className="text-gray-600 text-sm">No weapons recorded.</p>
+      )}
+
       {weapons.length > 0 && (
-        <div className="space-y-1">
-          {weapons.map((w, i) => (
-            <div key={i} className="flex items-center justify-between bg-void rounded px-3 py-1.5 text-sm">
-              <div className="flex gap-3 flex-wrap items-center min-w-0">
-                <span className="text-gray-200 font-medium">{w.name}</span>
-                {w.damage && <span className="text-xs text-gray-500">Dmg: {w.damage}</span>}
-                {w.range  && <span className="text-xs text-gray-500">Rng: {w.range}</span>}
-                {w.clips  && <span className="text-xs text-gray-500">Clips: {w.clips}</span>}
-                {w.traits && <span className="text-xs text-gray-600 italic">{w.traits}</span>}
-              </div>
-              <button type="button" onClick={() => onChange(weapons.filter((_, j) => j !== i))}
-                className="text-gray-700 hover:text-blood text-xs ml-2 shrink-0 transition-colors">✕</button>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-600 text-xs uppercase tracking-wider border-b border-void-border">
+                <th className="pb-2 pr-4">Name</th>
+                <th className="pb-2 pr-4">Damage</th>
+                <th className="pb-2 pr-4">Range</th>
+                <th className="pb-2 pr-4">Clips</th>
+                <th className="pb-2 pr-4">Traits</th>
+                <th className="pb-2">Notes</th>
+                <th className="pb-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {weapons.map((w, i) => (
+                <tr key={i} className="border-b border-void-border/30 hover:bg-void/30">
+                  <td className="py-2 pr-4 text-gray-200 font-medium">{w.name}</td>
+                  <td className="py-2 pr-4 text-gray-400">{w.damage || "—"}</td>
+                  <td className="py-2 pr-4 text-gray-400">{w.range || "—"}</td>
+                  <td className="py-2 pr-4 text-gray-400">{w.clips || "—"}</td>
+                  <td className="py-2 pr-4 text-gray-400">{w.traits || "—"}</td>
+                  <td className="py-2 text-gray-500 text-xs">{w.notes || ""}</td>
+                  <td className="py-2 pl-3">
+                    <button type="button" onClick={() => onChange(weapons.filter((_, j) => j !== i))}
+                      className="text-gray-700 hover:text-blood transition-colors text-xs">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {adding && (
-        <div className="bg-void rounded p-3 space-y-2 border border-void-border">
-          <div className="flex gap-2 flex-wrap">
-            <input className="vtm-input flex-1 min-w-28 py-1 text-sm" placeholder="Name *"
-              value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
-            <input className="vtm-input w-28 py-1 text-sm" placeholder="Damage"
-              value={form.damage} onChange={(e) => set("damage", e.target.value)} />
-            <input className="vtm-input w-24 py-1 text-sm" placeholder="Range"
-              value={form.range} onChange={(e) => set("range", e.target.value)} />
-            <input className="vtm-input w-20 py-1 text-sm" placeholder="Clips"
-              value={form.clips} onChange={(e) => set("clips", e.target.value)} />
+        <div className="mt-4 bg-void border border-void-border rounded-lg p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Name *</label>
+              <SuggestionInput id="mp-weapon-name" value={form.name}
+                onChange={(v) => set("name", v)} suggestions={WEAPON_NAME_SUGGESTIONS}
+                placeholder="e.g. Combat Knife" autoFocus />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Damage</label>
+              <SuggestionInput id="mp-weapon-damage" value={form.damage}
+                onChange={(v) => set("damage", v)} suggestions={WEAPON_DAMAGE_SUGGESTIONS}
+                placeholder="e.g. Strength+1 (Aggravated)" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Range</label>
+              <SuggestionInput id="mp-weapon-range" value={form.range}
+                onChange={(v) => set("range", v)} suggestions={WEAPON_RANGE_SUGGESTIONS}
+                placeholder="e.g. Close" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Clips / Ammo</label>
+              <input className="vtm-input" placeholder="e.g. 15+1" value={form.clips}
+                onChange={(e) => set("clips", e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Traits</label>
+              <SuggestionInput id="mp-weapon-traits" value={form.traits}
+                onChange={(v) => set("traits", v)} suggestions={WEAPON_TRAITS_SUGGESTIONS}
+                placeholder="e.g. Concealable" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Notes</label>
+              <input className="vtm-input" placeholder="optional" value={form.notes}
+                onChange={(e) => set("notes", e.target.value)} />
+            </div>
           </div>
-          <input className="vtm-input py-1 text-sm" placeholder="Traits (optional)"
-            value={form.traits} onChange={(e) => set("traits", e.target.value)} />
-          <div className="flex gap-2">
-            <button type="button" onClick={handleAdd} disabled={!form.name.trim()}
-              className="vtm-btn py-1 px-3 text-xs disabled:opacity-40">Add</button>
-            <button type="button" onClick={() => { setAdding(false); setForm(BLANK_WEAPON); }}
-              className="vtm-btn-secondary py-1 px-2 text-xs">Cancel</button>
+          {weaponError && <p className="text-blood text-sm mb-2">{weaponError}</p>}
+          <div className="flex gap-3">
+            <button type="button" onClick={handleAdd} className="vtm-btn py-1 px-4 text-sm">
+              Add Weapon
+            </button>
+            <button type="button"
+              onClick={() => { setAdding(false); setWeaponError(null); setForm(BLANK_WEAPON); }}
+              className="vtm-btn-secondary py-1 px-3 text-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
-      {weapons.length === 0 && !adding && <p className="text-gray-700 text-xs italic">No weapons.</p>}
     </div>
   );
 }

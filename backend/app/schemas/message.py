@@ -5,14 +5,16 @@ from datetime import datetime
 
 class MessageCreate(BaseModel):
     character_id: int
+    subject: Optional[str] = None
     body: str
-    ephemeral: bool = False  # True = expires 15 min after sending
+    ephemeral: bool = False
 
 
 class MessageOut(BaseModel):
     id: int
     sender_id: int
     sender_username: str
+    subject: Optional[str]
     body: str
     is_read: bool
     ephemeral: bool
