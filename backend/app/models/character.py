@@ -74,6 +74,10 @@ class Character(Base):
     # Format: {"attributes": {"Strength": 1}, "skills": {"Brawl": 2}, "disciplines": {"5": {"dots": 1, "power_id": null}}}
     temp_dots = Column(JSON, nullable=True)
 
+    # Learning dots — green progress dots per stat (max 3 each), persisted between sessions
+    # Format: {"Strength": 2, "Brawl": 1}
+    learning_dots = Column(JSON, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -171,6 +175,7 @@ class CharacterFlaw(Base):
     id = Column(Integer, primary_key=True)
     character_id = Column(Integer, ForeignKey("characters.id"), nullable=False)
     flaw_id = Column(Integer, ForeignKey("flaws.id"), nullable=False)
+    level = Column(Integer, nullable=True)
     notes = Column(String)
     character = relationship("Character", back_populates="flaws")
     flaw = relationship("Flaw")

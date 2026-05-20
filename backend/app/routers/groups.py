@@ -117,6 +117,7 @@ def build_character_card(char: Character, db: Session) -> GMCharacterCard:
         ],
         notes=char.notes,
         retainers=retainers_data,
+        learning_dots=char.learning_dots or {},
     )
 
 

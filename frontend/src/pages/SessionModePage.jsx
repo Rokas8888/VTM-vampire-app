@@ -246,8 +246,10 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         willpower_superficial: wpTrack.filter(s => s === 1).length,
         willpower_aggravated:  wpTrack.filter(s => s === 2).length,
       });
+    } finally {
+      setSaving(false);
       setCardEditMode(false);
-    } finally { setSaving(false); }
+    }
   };
 
   const sendMessage = async () => {
@@ -409,25 +411,29 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
           </div>
         ))}
 
-        {/* Stains row — always visible, editable by GM in edit mode */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 w-16 shrink-0">Stains</span>
-          <div className="flex gap-1 flex-wrap">
-            {Array.from({ length: 10 }, (_, i) => (
-              <div
-                key={i}
-                onClick={cardEditMode && isGM
-                  ? () => set("humanity_stains", i + 1 === ls.humanity_stains ? i : i + 1)
-                  : undefined}
-                className={`w-4 h-4 rounded-full border ${
-                  i < ls.humanity_stains
-                    ? "bg-red-700 border-red-700"
-                    : "border-gray-700"
-                } ${cardEditMode && isGM ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
-              />
-            ))}
+        {/* Stains row — max slots = 10 - humanity; GM can toggle without edit mode */}
+        {(10 - ls.humanity) > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600 w-16 shrink-0">Stains</span>
+            <div className="flex flex-wrap">
+              {Array.from({ length: 10 - ls.humanity }, (_, i) => (
+                <div
+                  key={i}
+                  onClick={isGM ? () => {
+                    const newVal = i + 1 === ls.humanity_stains ? i : i + 1;
+                    set("humanity_stains", newVal);
+                    api.put(`/api/characters/${char.id}/gm-adjust`, { humanity_stains: newVal }).catch(() => {});
+                  } : undefined}
+                  className={`w-3 h-3 rounded-full border mx-1 transition-all ${
+                    i < ls.humanity_stains
+                      ? "bg-blood-dark/50 border-blood-dark"
+                      : "border-gray-700 hover:border-gray-500"
+                  } ${isGM ? "cursor-pointer" : ""}`}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-600 w-16 shrink-0">Hunger</span>
@@ -553,6 +559,15 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Learning dots summary */}
+      {char.learning_dots && Object.keys(char.learning_dots).filter(k => char.learning_dots[k] > 0).length > 0 && (
+        <div className="border-t border-void-border/40 pt-2">
+          <span className="text-green-500 text-xs">
+            🟢 {Object.keys(char.learning_dots).filter(k => char.learning_dots[k] > 0).length} stat{Object.keys(char.learning_dots).filter(k => char.learning_dots[k] > 0).length !== 1 ? "s" : ""} in progress
+          </span>
         </div>
       )}
 

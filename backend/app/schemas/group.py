@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 
 class GroupCreate(BaseModel):
@@ -38,6 +38,7 @@ class GMCharacterCard(BaseModel):
     all_skills: List[dict]      # full skill list
     attributes: List[dict]      # [{"name": str, "value": int}]
     disciplines: List[dict] = []  # [{"name": str, "level": int}]
+    learning_dots: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     retainers: List[dict] = []   # [{id, name, concept, health, health_superficial, health_aggravated, willpower, willpower_superficial, willpower_aggravated}]
 

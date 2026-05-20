@@ -115,6 +115,12 @@ export default function DashboardPage() {
   // temp dots mode
   const [tempMode, setTempMode] = useState(false);
 
+  // edit advantages mode (merits/flaws/backgrounds)
+  const [editAdvantagesMode, setEditAdvantagesMode] = useState(false);
+
+  // learning dots mode
+  const [learningMode, setLearningMode] = useState(false);
+
   // edit mode
   const [editMode, setEditMode]   = useState(false);
   const [editForm, setEditForm]   = useState({});
@@ -165,6 +171,8 @@ export default function DashboardPage() {
     setEditMode(false);
     setXpAmount(""); setXpError(null);
     setTempMode(false);
+    setEditAdvantagesMode(false);
+    setLearningMode(false);
     setShowMessages(false);
     setCharMessages([]);
     setUnreadCount(0);
@@ -381,6 +389,17 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSetLearningDot = async (statName, value) => {
+    const next = { ...(selected?.learning_dots ?? {}), [statName]: value };
+    if (value === 0) delete next[statName];
+    setSelected(prev => ({ ...prev, learning_dots: next }));
+    try {
+      await api.put(`/api/characters/${selected.id}/learning-dots`, { learning_dots: next });
+    } catch (err) {
+      console.error("Failed to save learning dots", err);
+    }
+  };
+
   // ── Session save ──────────────────────────────────────────────────────────
   const handleSaveSession = async (sessionData) => {
     try {
@@ -549,55 +568,59 @@ export default function DashboardPage() {
 
             <div className="h-4 border-l border-void-border mx-1" />
 
-            {/* XP + Improve — hidden for retainers */}
+            {/* XP button + Mode dropdown — hidden for retainers */}
             {!selected.is_retainer && <>
-              <button
-                onClick={() => { openPanel("xp"); setXpMode("add"); }}
-                className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                  activePanel === "xp"
-                    ? "border-blood text-blood bg-blood-dark/20"
-                    : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-                }`}
-                title="Add or remove experience points"
-              >XP</button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { openPanel("xp"); setXpMode("add"); }}
+                  className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
+                    activePanel === "xp"
+                      ? "border-blood text-blood bg-blood-dark/20"
+                      : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
+                  }`}
+                  title="Add or remove experience points"
+                >XP</button>
 
-              <div className="h-4 border-l border-void-border mx-1" />
+                <select
+                  value={
+                    improveMode ? "improve" :
+                    tempMode ? "temp" :
+                    editAdvantagesMode ? "merits" :
+                    learningMode ? "learning" : "none"
+                  }
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (v === "ambition") { openEdit(); return; }
+                    setImproveMode(v === "improve");
+                    setTempMode(v === "temp");
+                    setEditAdvantagesMode(v === "merits");
+                    setLearningMode(v === "learning");
+                    if (v === "improve") { setImproveError(null); closePanel(); }
+                  }}
+                  className={`shrink-0 w-auto max-w-[9rem] px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors cursor-pointer ${
+                    improveMode || tempMode || editAdvantagesMode || learningMode
+                      ? "border-blood text-blood bg-blood-dark/20"
+                      : "border-void-border text-gray-500 bg-void hover:border-blood hover:text-blood"
+                  }`}
+                  title="Switch editing mode"
+                >
+                  <option value="none">Edit</option>
+                  <option value="improve">Improve Stats</option>
+                  <option value="temp">Temp Dots</option>
+                  <option value="merits">Edit Merits</option>
+                  <option value="learning">Learning Dots</option>
+                  <option value="ambition">Ambition &amp; Desire</option>
+                </select>
 
-              <button
-                onClick={() => { setImproveMode(!improveMode); setImproveError(null); closePanel(); setTempMode(false); }}
-                className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                  improveMode
-                    ? "border-blood text-blood bg-blood-dark/20"
-                    : "border-void-border text-gray-500 hover:border-blood hover:text-blood"
-                }`}
-                title="Spend XP to raise attributes and skills"
-              >{improveMode ? "✓ Improving…" : "Improve Stats"}</button>
+                <button
+                  onClick={() => { setImproveMode(false); setTempMode(false); setEditAdvantagesMode(false); setLearningMode(false); }}
+                  className={`text-xs transition-colors leading-none px-1 ${improveMode || tempMode || editAdvantagesMode || learningMode ? "text-gray-500 hover:text-blood" : "invisible"}`}
+                  title="Exit edit mode"
+                >✕</button>
+              </div>
 
               <div className="h-4 border-l border-void-border mx-1" />
             </>}
-
-            {/* Temporary Dots */}
-            <button
-              onClick={() => { setTempMode(!tempMode); setImproveMode(false); closePanel(); }}
-              className={`px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors ${
-                tempMode
-                  ? "border-blue-500 text-blue-400 bg-blue-900/20"
-                  : "border-void-border text-gray-500 hover:border-blue-500 hover:text-blue-400"
-              }`}
-              title="Add/remove temporary dots (shown in blue)"
-            >
-              {tempMode ? "✓ Temp Dots" : "Temp Dots"}
-            </button>
-
-            <div className="h-4 border-l border-void-border mx-1" />
-
-            {/* Edit Ambition & Desire */}
-            <button
-              onClick={openEdit}
-              className="px-2 py-1 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-500 hover:border-blood hover:text-blood transition-colors"
-            >
-              Edit Ambition & Desire
-            </button>
 
             {/* Messages — hidden for retainers */}
             {!selected.is_retainer && (
@@ -699,6 +722,17 @@ export default function DashboardPage() {
             hunger={sessionHunger}
             onClose={() => setShowDice(false)}
             sidebar={true}
+            characterId={selected?.id ?? null}
+            willpowerSuperficial={selected?.willpower_superficial ?? 0}
+            willpowerMax={selected?.willpower ?? 0}
+            onWillpowerSpend={async () => {
+              if (selected?.id) {
+                try {
+                  const res = await api.get(`/api/characters/${selected.id}`);
+                  setSelected(res.data);
+                } catch (_) {}
+              }
+            }}
           />
         )}
 
@@ -833,6 +867,10 @@ export default function DashboardPage() {
             onUnimprove={selected.is_retainer ? handleUnimprove : (improveMode ? handleUnimprove : undefined)}
             freeEdit={selected.is_retainer}
             tempMode={tempMode}
+            forceEditAdvantages={editAdvantagesMode}
+            learningMode={learningMode}
+            learningDots={selected?.learning_dots ?? {}}
+            onSetLearningDot={handleSetLearningDot}
             onSetTempDots={handleSetTempDots}
             onSaveSession={handleSaveSession}
             onHungerChange={setSessionHunger}

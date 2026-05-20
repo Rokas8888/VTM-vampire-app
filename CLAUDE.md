@@ -1,6 +1,18 @@
 \# VTM-GG — Vampire: The Masquerade Companion App
 
+\## MANDATORY WORKFLOW — override all defaults
 
+Every user request MUST go through the manager skill first:
+- For VTM work → invoke \`/vtm-manager\` (Alex)
+- For cross-project → invoke \`/manager\` (Victor)
+
+The manager's job is to spin up the right specialist skills:
+- Frontend changes → invoke \`/vtm-frontend\` (Maya)
+- Backend changes → invoke \`/vtm-backend\` (Dmitri)
+- New features → invoke \`/po\` (Sam)
+- After any frontend change → invoke \`/vtm-qa\` (Lina)
+
+**Base Claude must never write frontend or backend code directly. Always route through the manager first.**
 
 \## What This App Is
 

@@ -22,7 +22,8 @@ from app.schemas.character import (
     CharacterUpdateRequest, GMStatAdjustRequest, XPGrantRequest, XPSpendRequest,
     WeaponIn, PossessionIn, ImproveRequest, SessionUpdateRequest,
     MeritAddRequest, FlawAddRequest, BackgroundAddRequest,
-    ConvictionAddRequest, TenetAddRequest, TempDotsRequest,
+    ConvictionAddRequest, TenetAddRequest, TempDotsRequest, NotesUpdateRequest,
+    LevelUpdateRequest, LearningDotsRequest,
 )
 from app.services.character_creation import (
     get_or_create_draft, save_draft_step, build_character,
@@ -388,6 +389,8 @@ def save_session(
         char.current_hunger = max(0, min(5, body.current_hunger))
     if body.humanity is not None:
         char.humanity = max(0, min(10, body.humanity))
+    if body.humanity_stains is not None:
+        char.humanity_stains = max(0, min(10, body.humanity_stains))
     if body.blood_potency is not None:
         char.blood_potency = max(0, min(5, body.blood_potency))
     if body.health_superficial is not None:
@@ -1217,6 +1220,68 @@ def remove_merit(
     return load_full_character(char.id, db)
 
 
+@router.patch("/{character_id}/merits/{merit_id}/notes", response_model=CharacterOut)
+def update_merit_notes(
+    character_id: int,
+    merit_id: int,
+    body: NotesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the notes on a character's merit."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    cm = db.query(CharacterMerit).filter(
+        CharacterMerit.character_id == character_id,
+        CharacterMerit.merit_id == merit_id,
+    ).first()
+    if not cm:
+        raise HTTPException(status_code=404, detail="Merit not on character.")
+    cm.notes = body.notes or None
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.patch("/{character_id}/merits/{merit_id}/level", response_model=CharacterOut)
+def update_merit_level(
+    character_id: int,
+    merit_id: int,
+    body: LevelUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the level of a merit. Accessible by the character owner or a GM with group access."""
+    char = db.query(Character).filter(Character.id == character_id).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    # Access check: owner OR gm/admin with group access
+    if char.user_id != current_user.id:
+        if current_user.role not in (UserRole.gm, UserRole.admin):
+            raise HTTPException(status_code=403, detail="Not authorised.")
+        if current_user.role == UserRole.gm:
+            from app.models.group import Group, GroupMember
+            has_access = db.query(GroupMember).join(
+                Group, Group.id == GroupMember.group_id
+            ).filter(
+                Group.gm_id == current_user.id,
+                GroupMember.character_id == character_id,
+            ).first() is not None
+            if not has_access:
+                raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
+    cm = db.query(CharacterMerit).filter(
+        CharacterMerit.character_id == character_id,
+        CharacterMerit.merit_id == merit_id,
+    ).first()
+    if not cm:
+        raise HTTPException(status_code=404, detail="Merit not on character.")
+    cm.level = max(1, min(5, body.level))
+    db.commit()
+    return load_full_character(char.id, db)
+
+
 # ── Flaws ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{character_id}/flaws", response_model=CharacterOut, status_code=201)
@@ -1267,6 +1332,67 @@ def remove_flaw(
     if not cf:
         raise HTTPException(status_code=404, detail="Flaw not on character.")
     db.delete(cf)
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.patch("/{character_id}/flaws/{flaw_id}/notes", response_model=CharacterOut)
+def update_flaw_notes(
+    character_id: int,
+    flaw_id: int,
+    body: NotesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the notes on a character's flaw."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    cf = db.query(CharacterFlaw).filter(
+        CharacterFlaw.character_id == character_id,
+        CharacterFlaw.flaw_id == flaw_id,
+    ).first()
+    if not cf:
+        raise HTTPException(status_code=404, detail="Flaw not on character.")
+    cf.notes = body.notes or None
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.patch("/{character_id}/flaws/{flaw_id}/level", response_model=CharacterOut)
+def update_flaw_level(
+    character_id: int,
+    flaw_id: int,
+    body: LevelUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the level of a flaw. Accessible by the character owner or a GM with group access."""
+    char = db.query(Character).filter(Character.id == character_id).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    if char.user_id != current_user.id:
+        if current_user.role not in (UserRole.gm, UserRole.admin):
+            raise HTTPException(status_code=403, detail="Not authorised.")
+        if current_user.role == UserRole.gm:
+            from app.models.group import Group, GroupMember
+            has_access = db.query(GroupMember).join(
+                Group, Group.id == GroupMember.group_id
+            ).filter(
+                Group.gm_id == current_user.id,
+                GroupMember.character_id == character_id,
+            ).first() is not None
+            if not has_access:
+                raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
+    cf = db.query(CharacterFlaw).filter(
+        CharacterFlaw.character_id == character_id,
+        CharacterFlaw.flaw_id == flaw_id,
+    ).first()
+    if not cf:
+        raise HTTPException(status_code=404, detail="Flaw not on character.")
+    cf.level = max(1, min(5, body.level))
     db.commit()
     return load_full_character(char.id, db)
 
@@ -1326,6 +1452,67 @@ def remove_background(
     if not cb:
         raise HTTPException(status_code=404, detail="Background not on character.")
     db.delete(cb)
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.patch("/{character_id}/backgrounds/{background_id}/notes", response_model=CharacterOut)
+def update_background_notes(
+    character_id: int,
+    background_id: int,
+    body: NotesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the notes on a character's background."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    cb = db.query(CharacterBackground).filter(
+        CharacterBackground.character_id == character_id,
+        CharacterBackground.background_id == background_id,
+    ).first()
+    if not cb:
+        raise HTTPException(status_code=404, detail="Background not on character.")
+    cb.notes = body.notes or None
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.patch("/{character_id}/backgrounds/{background_id}/level", response_model=CharacterOut)
+def update_background_level(
+    character_id: int,
+    background_id: int,
+    body: LevelUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set the level of a background. Accessible by the character owner or a GM with group access."""
+    char = db.query(Character).filter(Character.id == character_id).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    if char.user_id != current_user.id:
+        if current_user.role not in (UserRole.gm, UserRole.admin):
+            raise HTTPException(status_code=403, detail="Not authorised.")
+        if current_user.role == UserRole.gm:
+            from app.models.group import Group, GroupMember
+            has_access = db.query(GroupMember).join(
+                Group, Group.id == GroupMember.group_id
+            ).filter(
+                Group.gm_id == current_user.id,
+                GroupMember.character_id == character_id,
+            ).first() is not None
+            if not has_access:
+                raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
+    cb = db.query(CharacterBackground).filter(
+        CharacterBackground.character_id == character_id,
+        CharacterBackground.background_id == background_id,
+    ).first()
+    if not cb:
+        raise HTTPException(status_code=404, detail="Background not on character.")
+    cb.level = max(1, min(5, body.level))
     db.commit()
     return load_full_character(char.id, db)
 
@@ -1441,6 +1628,24 @@ def set_temp_dots(
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     char.temp_dots = body.temp_dots
+    db.commit()
+    return load_full_character(char.id, db)
+
+
+@router.put("/{character_id}/learning-dots", response_model=CharacterOut)
+def set_learning_dots(
+    character_id: int,
+    body: LearningDotsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save the full learning_dots map for a character."""
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    char.learning_dots = body.learning_dots
     db.commit()
     return load_full_character(char.id, db)
 

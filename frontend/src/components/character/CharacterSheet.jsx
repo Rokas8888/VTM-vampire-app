@@ -3,6 +3,7 @@ import api from "../../services/api";
 import DotRating from "../shared/DotRating";
 import DiceRollerModal from "../shared/DiceRollerModal";
 import ConditionBadges from "../shared/ConditionBadges";
+import ConfirmDeleteModal from "../shared/ConfirmDeleteModal";
 import { getClanBg } from "../../utils/clanImages";
 
 // ── Weapon / Possession suggestion lists ─────────────────────────────────────
@@ -104,8 +105,8 @@ function HumanityTracker({ value, stains, onChangeHumanity, onChangeStains, free
                 if (!freeEdit) return;
                 onChangeHumanity(value - 1);
               } else if (isStain) {
-                // stain dots are not directly clickable — cleared via remorse roll
-                return;
+                // Player can un-press: clicking a stain reduces stains to this position
+                if (!freeEdit) onChangeStains(i - value);
               } else {
                 // empty slot: GM adds a permanent dot; player marks a stain
                 if (freeEdit) {
@@ -590,7 +591,7 @@ function DisciplineCard({ cd, learnedPowerIds, isInClan, onImprove, onUnimprove,
 }
 
 // ── Attribute/skill column ────────────────────────────────────────────────────
-function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot, freeEdit, onAddSpecialty, onDeleteSpecialty }) {
+function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove, onUnimprove, availableXp, tempDotsMap, onAddTempDot, onRemoveTempDot, freeEdit, onAddSpecialty, onDeleteSpecialty, learningDotsMap, onSetLearningDot }) {
   const minVal = traitType === "attribute" ? 1 : 0;
   const canEditSpecialties = traitType === "skill" && (onImprove || freeEdit) && (onAddSpecialty || onDeleteSpecialty);
   // Per-skill "add specialty" input state
@@ -609,7 +610,8 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
         const buyCost     = traitType === "attribute" ? (val + 1) * 5 : (val + 1) * 3;
         const refund      = traitType === "attribute" ? val * 5 : val * 3;
         const canAfford   = onImprove && val < 5 && (freeEdit || availableXp >= buyCost);
-        const tempVal     = tempDotsMap?.[name] ?? 0;
+        const tempVal      = tempDotsMap?.[name] ?? 0;
+        const learnVal     = learningDotsMap?.[name] ?? 0;
         const isAddingHere = addingSpecialtyFor === name;
         return (
           <div key={name} className="mb-2">
@@ -649,6 +651,26 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
                 )
               ) : null}
 
+              {/* Green learning dots (max 3) — filled dots always visible, clickable only in learningMode */}
+              {(learnVal > 0 || onSetLearningDot) && (
+                <div className="flex gap-px mr-1">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <div
+                      key={i}
+                      onClick={onSetLearningDot ? () => onSetLearningDot(name, i + 1 === learnVal ? 0 : i + 1) : undefined}
+                      className={`w-2 h-2 rounded-full border transition-colors ${
+                        i < learnVal
+                          ? "bg-green-600 border-green-600"
+                          : onSetLearningDot
+                            ? "border-green-800 hover:border-green-500 cursor-pointer"
+                            : "border-transparent"
+                      }`}
+                      title={onSetLearningDot ? (i < learnVal ? "Remove learning dot" : "Add learning dot") : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Dots: permanent filled, blue temp bonus, or dim × for excluded — all inside track */}
               <DotRating value={val} tempValue={tempVal} max={5} size="text-sm" />
 
@@ -681,7 +703,7 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
           </div>
 
           {/* Specialties — collapsible on mobile, always open on sm+ */}
-          {traitType === "skill" && (specs.length > 0 || (canEditSpecialties && val > 0)) && (
+          {traitType === "skill" && (specs.length > 0 || canEditSpecialties) && (
             <div className="ml-0 mt-0.5">
               {/* Specialty list — always visible on sm+, toggle-gated on mobile via inline ▼ button */}
               <div className={`${specs.length > 0 && !openSpecs[name] ? "hidden" : "block"}`}>
@@ -699,7 +721,7 @@ function StatColumn({ heading, names, lookup, specialtyMap, traitType, onImprove
                 ))}
 
                 {/* Add specialty */}
-                {canEditSpecialties && onAddSpecialty && val > 0 && (
+                {canEditSpecialties && onAddSpecialty && (
                   isAddingHere ? (
                     <div className="flex items-center gap-1 mt-1">
                       <input
@@ -779,6 +801,10 @@ export default function CharacterSheet({
   tempMode = false,  // when true, shows blue temp-dot +/- buttons
   onSetTempDots,     // (tempDotsObj) — saves temp dots to backend
   freeEdit = false,  // when true, all stats editable for free (retainer mode)
+  forceEditAdvantages = false, // controlled from parent dropdown
+  learningMode = false,        // green learning dots mode
+  learningDots = {},           // { statName: 0–3 }
+  onSetLearningDot,            // (statName, value) — save one learning dot
   onOpenRetainer,    // (retainerId) — opens retainer sheet
   onAddPredatorType, // () — called when player wants to set a predator type post-wizard
   onAddSpecialty,    // (skillName, specialtyName) — add specialty
@@ -790,7 +816,7 @@ export default function CharacterSheet({
   const [currentBP,       setCurrentBP]       = useState(character.blood_potency);
   const [currentHunger,   setCurrentHunger]   = useState(character.current_hunger ?? 0);
   const [currentHumanity, setCurrentHumanity] = useState(character.humanity);
-  const [stains,          setStains]          = useState(0);
+  const [stains,          setStains]          = useState(character.humanity_stains ?? 0);
   const [healthTrack,     setHealthTrack]     = useState(() =>
     buildTrack(character.health, character.health_superficial, character.health_aggravated));
   const [wpTrack,         setWpTrack]         = useState(() =>
@@ -886,8 +912,9 @@ export default function CharacterSheet({
       return next;
     });
 
-  // Add-merit/flaw/background panel (shown when onImprove is active OR editAdvantages is on)
-  const [editAdvantages, setEditAdvantages] = useState(false);
+  // Add-merit/flaw/background panel — controlled by local toggle OR parent dropdown
+  const [editAdvantagesLocal, setEditAdvantagesLocal] = useState(false);
+  const editAdvantages = forceEditAdvantages || editAdvantagesLocal;
   // Ritual book
   const [showRitualBook, setShowRitualBook] = useState(false);
   const [ritualBookDiscId, setRitualBookDiscId] = useState(null); // which discipline opened the book
@@ -909,6 +936,10 @@ export default function CharacterSheet({
   const [addAdvNotes, setAddAdvNotes] = useState("");
   const [addAdvSaving, setAddAdvSaving] = useState(false);
   const [addAdvError, setAddAdvError] = useState(null);
+  const [noteEditKey,    setNoteEditKey]    = useState(null); // "merit-{id}" | "bg-{id}" | "flaw-{id}"
+  const [noteEditText,   setNoteEditText]   = useState("");
+  const [noteEditSaving, setNoteEditSaving] = useState(false);
+  const [deleteTarget,   setDeleteTarget]   = useState(null); // { label, onConfirm }
   const fetchConditions = async (id) => {
     try {
       const res = await api.get(`/api/conditions/character/${id}`);
@@ -921,7 +952,7 @@ export default function CharacterSheet({
     setCurrentBP(character.blood_potency);
     setCurrentHunger(character.current_hunger ?? 0);
     setCurrentHumanity(character.humanity);
-    setStains(0);
+    setStains(character.humanity_stains ?? 0);
     setHealthTrack(buildTrack(character.health, character.health_superficial, character.health_aggravated));
     setWpTrack(buildTrack(character.willpower, character.willpower_superficial, character.willpower_aggravated));
     setSessionDirty(false);
@@ -952,6 +983,18 @@ export default function CharacterSheet({
     setWpTrack(buildTrack(character.willpower, character.willpower_superficial, character.willpower_aggravated));
   }, [character.willpower]);
 
+  useEffect(() => {
+    setCurrentHumanity(character.humanity);
+  }, [character.humanity]);
+
+  useEffect(() => {
+    setCurrentBP(character.blood_potency);
+  }, [character.blood_potency]);
+
+  useEffect(() => {
+    setStains(character.humanity_stains ?? 0);
+  }, [character.humanity_stains]);
+
   // Load game data lists when the add-advantage panel opens
   useEffect(() => {
     if (!showAddAdvantage) return;
@@ -971,6 +1014,7 @@ export default function CharacterSheet({
       blood_potency:         character.blood_potency,
       current_hunger:        character.current_hunger ?? 0,
       humanity:              character.humanity,
+      humanity_stains:       character.humanity_stains ?? 0,
       health_superficial:    character.health_superficial,
       health_aggravated:     character.health_aggravated,
       willpower_superficial: character.willpower_superficial,
@@ -989,6 +1033,7 @@ export default function CharacterSheet({
           blood_potency:         currentBP,
           current_hunger:        currentHunger,
           humanity:              currentHumanity,
+          humanity_stains:       stains,
           health_superficial:    healthTrack.filter((s) => s === 1).length,
           health_aggravated:     healthTrack.filter((s) => s === 2).length,
           willpower_superficial: wpTrack.filter((s) => s === 1).length,
@@ -1001,7 +1046,7 @@ export default function CharacterSheet({
       }
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [sessionDirty, currentBP, currentHunger, currentHumanity, healthTrack, wpTrack]);
+  }, [sessionDirty, currentBP, currentHunger, currentHumanity, stains, healthTrack, wpTrack]);
 
   // Dirty-marking setters
   const dirty = () => setSessionDirty(true);
@@ -1374,13 +1419,17 @@ export default function CharacterSheet({
       <Section title="Attributes">
         {onImprove && !freeEdit && <p className="text-xs text-gray-600 mb-3">Cost: new level × 5 XP · Available: <span className="text-blood">{availableXp} XP</span></p>}
         {tempMode && <p className="text-xs text-blue-500/70 mb-3">Temp mode active — blue dots are temporary and not XP-spent.</p>}
+        {learningMode && <p className="text-xs text-green-700/80 mb-3">Learning mode — click green dots (max 3) to track progress toward a stat.</p>}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
           <StatColumn heading="Physical" names={PHYSICAL_ATTRS}  lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
+            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
           <StatColumn heading="Social"   names={SOCIAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
+            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
           <StatColumn heading="Mental"   names={MENTAL_ATTRS}    lookup={attrMap} traitType="attribute" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
-            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined} />
+            tempDotsMap={tempDots.attributes} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("attributes", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("attributes", n) : undefined}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
         </div>
       </Section>
 
@@ -1390,13 +1439,16 @@ export default function CharacterSheet({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
           <StatColumn heading="Physical" names={PHYSICAL_SKILLS} lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
-            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
           <StatColumn heading="Social"   names={SOCIAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
-            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
           <StatColumn heading="Mental"   names={MENTAL_SKILLS}   lookup={skillMap} specialtyMap={specialtyMap} traitType="skill" onImprove={onImprove} onUnimprove={onUnimprove} availableXp={availableXp} freeEdit={freeEdit}
             tempDotsMap={tempDots.skills} onAddTempDot={tempMode ? (_, n) => handleAddTempDot("skills", n) : undefined} onRemoveTempDot={tempMode ? (_, n) => handleRemoveTempDot("skills", n) : undefined}
-            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty} />
+            onAddSpecialty={onAddSpecialty} onDeleteSpecialty={onDeleteSpecialty}
+            learningDotsMap={learningDots} onSetLearningDot={learningMode ? onSetLearningDot : undefined} />
         </div>
       </Section>
 
@@ -1500,7 +1552,7 @@ export default function CharacterSheet({
         <div className="flex items-center justify-between">
           <span>Advantages &amp; Flaws</span>
           <button
-            onClick={() => { setEditAdvantages((v) => !v); setShowAddAdvantage(false); }}
+            onClick={() => { setEditAdvantagesLocal((v) => !v); setShowAddAdvantage(false); }}
             className="text-xs font-sans normal-case tracking-normal text-gray-600 hover:text-blood transition-colors"
           >
             {editAdvantages ? "✕ Done" : "Edit"}
@@ -1555,18 +1607,55 @@ export default function CharacterSheet({
                           >ℹ</button>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <DotRating value={cm.level} max={5} size="text-xs" />
-                          {editAdvantages && (
+                          {editAdvantages && cm.level > 1 && (
                             <button
                               onClick={async () => {
                                 try {
-                                  const res = await api.delete(`/api/characters/${character.id}/merits/${cm.merit.id}?level=${cm.level}`);
+                                  const res = await api.patch(`/api/characters/${character.id}/merits/${cm.merit.id}/level`, { level: cm.level - 1 });
                                   if (onCharacterUpdate) onCharacterUpdate(res.data);
                                 } catch (e) { console.error(e); }
                               }}
-                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
-                              title="Remove merit"
-                            >✕</button>
+                              className="w-4 h-4 rounded-full border border-gray-700 text-gray-600 hover:border-blood hover:text-blood text-xs font-bold leading-none transition-colors"
+                              title="Lower merit level"
+                            >−</button>
+                          )}
+                          <DotRating value={cm.level} max={5} size="text-xs" />
+                          {editAdvantages && cm.level < 5 && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.patch(`/api/characters/${character.id}/merits/${cm.merit.id}/level`, { level: cm.level + 1 });
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                } catch (e) { console.error(e); }
+                              }}
+                              className="w-4 h-4 rounded-full border border-blood text-blood hover:bg-blood hover:text-white text-xs font-bold leading-none transition-colors"
+                              title="Raise merit level"
+                            >+</button>
+                          )}
+                          {editAdvantages && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  const nk = `merit-${cm.merit.id}`;
+                                  if (noteEditKey === nk) { setNoteEditKey(null); }
+                                  else { setNoteEditKey(nk); setNoteEditText(cm.notes || ""); }
+                                }}
+                                className="text-gray-700 hover:text-blue-400 text-xs ml-1 transition-colors"
+                                title="Edit notes"
+                              >✎</button>
+                              <button
+                                onClick={() => setDeleteTarget({
+                                  label: cm.merit.name,
+                                  onConfirm: async () => {
+                                    const res = await api.delete(`/api/characters/${character.id}/merits/${cm.merit.id}?level=${cm.level}`);
+                                    if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                    setDeleteTarget(null);
+                                  },
+                                })}
+                                className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                                title="Remove merit"
+                              >✕</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1574,6 +1663,36 @@ export default function CharacterSheet({
                         <div className="mt-0.5 ml-1 text-xs text-gray-500 leading-relaxed">
                           {cm.notes && <p className="text-gray-400 italic mb-0.5">"{cm.notes}"</p>}
                           {cm.merit.description && <p>{cm.merit.description}</p>}
+                        </div>
+                      )}
+                      {editAdvantages && noteEditKey === `merit-${cm.merit.id}` && (
+                        <div className="mt-1 ml-1">
+                          <textarea
+                            value={noteEditText}
+                            onChange={e => setNoteEditText(e.target.value)}
+                            placeholder="Add notes…"
+                            className="w-full text-xs bg-void-light border border-void-border rounded px-2 py-1 text-gray-300 placeholder-gray-600 resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={async () => {
+                                setNoteEditSaving(true);
+                                try {
+                                  const res = await api.patch(`/api/characters/${character.id}/merits/${cm.merit.id}/notes`, { notes: noteEditText || null });
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                  setNoteEditKey(null);
+                                } catch (e) { console.error(e); }
+                                finally { setNoteEditSaving(false); }
+                              }}
+                              disabled={noteEditSaving}
+                              className="text-xs px-2 py-0.5 bg-blood-dark/40 border border-blood-dark/60 text-blood hover:bg-blood-dark/60 rounded transition-colors"
+                            >{noteEditSaving ? "Saving…" : "Save"}</button>
+                            <button
+                              onClick={() => setNoteEditKey(null)}
+                              className="text-xs px-2 py-0.5 border border-gray-700 text-gray-500 hover:text-gray-300 rounded transition-colors"
+                            >Cancel</button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1589,7 +1708,7 @@ export default function CharacterSheet({
               : character.backgrounds.map((cb, i) => {
                   const key = `bg-${i}`;
                   const isOpen = expandedAdvantages.has(key);
-                  const hasDesc = !!cb.background.description;
+                  const hasDesc = !!(cb.background.description || cb.notes);
                   return (
                     <div key={i} className="mb-1.5">
                       <div className="flex justify-between items-center text-sm gap-1">
@@ -1635,22 +1754,90 @@ export default function CharacterSheet({
                             ) : <span className="w-4 h-4 inline-block" />
                           ) : null}
                           {editAdvantages && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await api.delete(`/api/characters/${character.id}/backgrounds/${cb.background.id}`);
-                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
-                                } catch (e) { console.error(e); }
-                              }}
-                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
-                              title="Remove background"
-                            >✕</button>
+                            <>
+                              {cb.level > 1 && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await api.patch(`/api/characters/${character.id}/backgrounds/${cb.background.id}/level`, { level: cb.level - 1 });
+                                      if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                    } catch (e) { console.error(e); }
+                                  }}
+                                  className="w-4 h-4 rounded-full border border-gray-700 text-gray-600 hover:border-blood hover:text-blood text-xs font-bold leading-none transition-colors"
+                                  title="Lower background level"
+                                >−</button>
+                              )}
+                              {cb.level < 5 && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await api.patch(`/api/characters/${character.id}/backgrounds/${cb.background.id}/level`, { level: cb.level + 1 });
+                                      if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                    } catch (e) { console.error(e); }
+                                  }}
+                                  className="w-4 h-4 rounded-full border border-blood text-blood hover:bg-blood hover:text-white text-xs font-bold leading-none transition-colors"
+                                  title="Raise background level"
+                                >+</button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  const nk = `bg-${cb.background.id}`;
+                                  if (noteEditKey === nk) { setNoteEditKey(null); }
+                                  else { setNoteEditKey(nk); setNoteEditText(cb.notes || ""); }
+                                }}
+                                className="text-gray-700 hover:text-blue-400 text-xs ml-1 transition-colors"
+                                title="Edit notes"
+                              >✎</button>
+                              <button
+                                onClick={() => setDeleteTarget({
+                                  label: cb.background.name,
+                                  onConfirm: async () => {
+                                    const res = await api.delete(`/api/characters/${character.id}/backgrounds/${cb.background.id}`);
+                                    if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                    setDeleteTarget(null);
+                                  },
+                                })}
+                                className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                                title="Remove background"
+                              >✕</button>
+                            </>
                           )}
                         </div>
                       </div>
-                      {isOpen && cb.background.description && (
+                      {isOpen && (
                         <div className="mt-0.5 ml-1 text-xs text-gray-500 leading-relaxed">
-                          <p>{cb.background.description}</p>
+                          {cb.notes && <p className="text-gray-400 italic mb-0.5">"{cb.notes}"</p>}
+                          {cb.background.description && <p>{cb.background.description}</p>}
+                        </div>
+                      )}
+                      {editAdvantages && noteEditKey === `bg-${cb.background.id}` && (
+                        <div className="mt-1 ml-1">
+                          <textarea
+                            value={noteEditText}
+                            onChange={e => setNoteEditText(e.target.value)}
+                            placeholder="Add notes…"
+                            className="w-full text-xs bg-void-light border border-void-border rounded px-2 py-1 text-gray-300 placeholder-gray-600 resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={async () => {
+                                setNoteEditSaving(true);
+                                try {
+                                  const res = await api.patch(`/api/characters/${character.id}/backgrounds/${cb.background.id}/notes`, { notes: noteEditText || null });
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                  setNoteEditKey(null);
+                                } catch (e) { console.error(e); }
+                                finally { setNoteEditSaving(false); }
+                              }}
+                              disabled={noteEditSaving}
+                              className="text-xs px-2 py-0.5 bg-blood-dark/40 border border-blood-dark/60 text-blood hover:bg-blood-dark/60 rounded transition-colors"
+                            >{noteEditSaving ? "Saving…" : "Save"}</button>
+                            <button
+                              onClick={() => setNoteEditKey(null)}
+                              className="text-xs px-2 py-0.5 border border-gray-700 text-gray-500 hover:text-gray-300 rounded transition-colors"
+                            >Cancel</button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1686,18 +1873,55 @@ export default function CharacterSheet({
                           >ℹ</button>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-blood-dark text-xs">{"●".repeat(cf.flaw.value)}</span>
-                          {editAdvantages && (
+                          {editAdvantages && (cf.level ?? cf.flaw.value) > 1 && (
                             <button
                               onClick={async () => {
                                 try {
-                                  const res = await api.delete(`/api/characters/${character.id}/flaws/${cf.flaw.id}`);
+                                  const res = await api.patch(`/api/characters/${character.id}/flaws/${cf.flaw.id}/level`, { level: (cf.level ?? cf.flaw.value) - 1 });
                                   if (onCharacterUpdate) onCharacterUpdate(res.data);
                                 } catch (e) { console.error(e); }
                               }}
-                              className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
-                              title="Remove flaw"
-                            >✕</button>
+                              className="w-4 h-4 rounded-full border border-gray-700 text-gray-600 hover:border-blood hover:text-blood text-xs font-bold leading-none transition-colors"
+                              title="Lower flaw level"
+                            >−</button>
+                          )}
+                          <span className="text-blood-dark text-xs">{"●".repeat(cf.level ?? cf.flaw.value)}</span>
+                          {editAdvantages && (cf.level ?? cf.flaw.value) < 5 && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.patch(`/api/characters/${character.id}/flaws/${cf.flaw.id}/level`, { level: (cf.level ?? cf.flaw.value) + 1 });
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                } catch (e) { console.error(e); }
+                              }}
+                              className="w-4 h-4 rounded-full border border-blood text-blood hover:bg-blood hover:text-white text-xs font-bold leading-none transition-colors"
+                              title="Raise flaw level"
+                            >+</button>
+                          )}
+                          {editAdvantages && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  const nk = `flaw-${cf.flaw.id}`;
+                                  if (noteEditKey === nk) { setNoteEditKey(null); }
+                                  else { setNoteEditKey(nk); setNoteEditText(cf.notes || ""); }
+                                }}
+                                className="text-gray-700 hover:text-blue-400 text-xs ml-1 transition-colors"
+                                title="Edit notes"
+                              >✎</button>
+                              <button
+                                onClick={() => setDeleteTarget({
+                                  label: cf.flaw.name,
+                                  onConfirm: async () => {
+                                    const res = await api.delete(`/api/characters/${character.id}/flaws/${cf.flaw.id}`);
+                                    if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                    setDeleteTarget(null);
+                                  },
+                                })}
+                                className="text-gray-700 hover:text-blood text-xs ml-1 transition-colors"
+                                title="Remove flaw"
+                              >✕</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1705,6 +1929,36 @@ export default function CharacterSheet({
                         <div className="mt-0.5 ml-1 text-xs text-gray-500 leading-relaxed">
                           {cf.notes && <p className="text-gray-400 italic mb-0.5">"{cf.notes}"</p>}
                           {cf.flaw.description && <p>{cf.flaw.description}</p>}
+                        </div>
+                      )}
+                      {editAdvantages && noteEditKey === `flaw-${cf.flaw.id}` && (
+                        <div className="mt-1 ml-1">
+                          <textarea
+                            value={noteEditText}
+                            onChange={e => setNoteEditText(e.target.value)}
+                            placeholder="Add notes…"
+                            className="w-full text-xs bg-void-light border border-void-border rounded px-2 py-1 text-gray-300 placeholder-gray-600 resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={async () => {
+                                setNoteEditSaving(true);
+                                try {
+                                  const res = await api.patch(`/api/characters/${character.id}/flaws/${cf.flaw.id}/notes`, { notes: noteEditText || null });
+                                  if (onCharacterUpdate) onCharacterUpdate(res.data);
+                                  setNoteEditKey(null);
+                                } catch (e) { console.error(e); }
+                                finally { setNoteEditSaving(false); }
+                              }}
+                              disabled={noteEditSaving}
+                              className="text-xs px-2 py-0.5 bg-blood-dark/40 border border-blood-dark/60 text-blood hover:bg-blood-dark/60 rounded transition-colors"
+                            >{noteEditSaving ? "Saving…" : "Save"}</button>
+                            <button
+                              onClick={() => setNoteEditKey(null)}
+                              className="text-xs px-2 py-0.5 border border-gray-700 text-gray-500 hover:text-gray-300 rounded transition-colors"
+                            >Cancel</button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2044,7 +2298,7 @@ export default function CharacterSheet({
                   value={weaponForm.damage}
                   onChange={(v) => setWeaponForm({ ...weaponForm, damage: v })}
                   suggestions={WEAPON_DAMAGE_SUGGESTIONS}
-                  placeholder="e.g. Strength+1 (Aggravated)"
+                  placeholder="e.g. +1"
                 />
               </div>
               <div>
@@ -2585,6 +2839,15 @@ export default function CharacterSheet({
           remorsePool={remorsePool}
           onClose={() => setShowRemorse(false)}
           onRemorseResult={handleRemorseResult}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          title="Remove"
+          description={`Remove "${deleteTarget.label}" from your character? This cannot be undone.`}
+          onConfirm={deleteTarget.onConfirm}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
 

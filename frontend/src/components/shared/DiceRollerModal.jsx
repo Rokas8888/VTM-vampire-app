@@ -246,16 +246,21 @@ export default function DiceRollerModal({
   onRemorseResult,
   characterId = null,
   sidebar = false,        // if true: fixed sidebar, not full-screen overlay
+  willpowerSuperficial = 0,
+  willpowerMax = 0,
+  onWillpowerSpend = null,
 }) {
-  const [numDice,      setNumDice]      = useState(mode === "remorse" ? remorsePool : 5);
-  const [hungerInput,  setHungerInput]  = useState(0);   // only used when manualHunger=true
-  const [dice,         setDice]         = useState([]);
-  const [rolling,      setRolling]      = useState(false);
-  const [results,      setResults]      = useState(null);
-  const [rollCount,    setRollCount]    = useState(0);   // increments each throw to retrigger animations
-  const [history,      setHistory]      = useState([]);
-  const [historyOpen,  setHistoryOpen]  = useState(false);
-  const [simpleMode,   setSimpleMode]   = useState(false); // ignore hunger dice entirely
+  const [numDice,           setNumDice]           = useState(mode === "remorse" ? remorsePool : 5);
+  const [hungerInput,       setHungerInput]       = useState(0);   // only used when manualHunger=true
+  const [dice,              setDice]              = useState([]);
+  const [rolling,           setRolling]           = useState(false);
+  const [results,           setResults]           = useState(null);
+  const [rollCount,         setRollCount]         = useState(0);   // increments each throw to retrigger animations
+  const [history,           setHistory]           = useState([]);
+  const [historyOpen,       setHistoryOpen]       = useState(false);
+  const [simpleMode,        setSimpleMode]        = useState(false); // ignore hunger dice entirely
+  const [selectedForReroll, setSelectedForReroll] = useState(new Set());
+  const [hasRerolled,       setHasRerolled]       = useState(false);
 
   const hungerCount = mode === "remorse" || simpleMode
     ? 0
@@ -270,10 +275,43 @@ export default function DiceRollerModal({
 
   useEffect(() => { fetchHistory(); }, []);
 
+  const toggleSelect = (i) => {
+    setSelectedForReroll(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) { next.delete(i); }
+      else if (next.size < 3) { next.add(i); }
+      return next;
+    });
+  };
+
+  const wpFull = willpowerMax > 0 && willpowerSuperficial >= willpowerMax;
+
+  const handleReroll = async () => {
+    const newDice = dice.map((d, i) =>
+      selectedForReroll.has(i)
+        ? { ...d, value: Math.floor(Math.random() * 10) + 1 }
+        : d
+    );
+    setDice(newDice);
+    setResults(analyze(newDice));
+    setHasRerolled(true);
+    setSelectedForReroll(new Set());
+    if (characterId) {
+      try {
+        await api.put(`/api/characters/${characterId}/session`, {
+          willpower_superficial: willpowerSuperficial + 1,
+        });
+        onWillpowerSpend?.();
+      } catch (_) {}
+    }
+  };
+
   const roll = () => {
     setRollCount((c) => c + 1);
     setRolling(true);
     setResults(null);
+    setSelectedForReroll(new Set());
+    setHasRerolled(false);
     const count = mode === "remorse" ? remorsePool : numDice;
     setDice(Array.from({ length: count }, (_, i) => ({ value: 0, isHunger: i < hungerCount })));
     const finalDice = rollPool(count, hungerCount);
@@ -471,9 +509,22 @@ export default function DiceRollerModal({
           {dice.length === 0 ? (
             <p className="text-red-900/50 font-gothic tracking-widest text-sm">Cast the dice upon the altar…</p>
           ) : (
-            dice.map((d, i) => (
-              <ThrowingDie key={i} value={d.value} isHunger={d.isHunger} rolling={rolling} animKey={rollCount} />
-            ))
+            dice.map((d, i) => {
+              const canSelect = mode === "normal" && !d.isHunger && d.value <= 5 && results !== null && !rolling && !hasRerolled;
+              const isSelected = selectedForReroll.has(i);
+              return (
+                <div
+                  key={i}
+                  onClick={canSelect ? () => toggleSelect(i) : undefined}
+                  className={`rounded transition-all ${
+                    isSelected    ? "ring-2 ring-blood cursor-pointer" :
+                    canSelect     ? "cursor-pointer hover:ring-1 hover:ring-gray-500" : ""
+                  }`}
+                >
+                  <ThrowingDie value={d.value} isHunger={d.isHunger} rolling={rolling} animKey={rollCount} />
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -496,6 +547,28 @@ export default function DiceRollerModal({
           )}
           {results.messyCritical && (
             <p className="text-orange-400/70 text-xs mt-2 italic">Victory tainted by Hunger — collateral damage is inevitable.</p>
+          )}
+        </div>
+      )}
+
+      {/* Willpower Reroll — normal mode only, once per roll */}
+      {mode === "normal" && results && !rolling && !hasRerolled && (
+        <div className="mb-4 flex flex-col items-center gap-1.5">
+          {selectedForReroll.size > 0 ? (
+            wpFull ? (
+              <span className="text-gray-600 text-xs">✕ No Willpower remaining — cannot reroll</span>
+            ) : (
+              <button
+                onClick={handleReroll}
+                className="bg-blood hover:bg-blood-dark text-white text-xs font-gothic tracking-wider px-3 py-1.5 rounded transition-colors"
+              >
+                Reroll {selectedForReroll.size} {selectedForReroll.size === 1 ? "die" : "dice"} — costs 1 WP
+              </button>
+            )
+          ) : (
+            dice.some(d => !d.isHunger && d.value <= 5) && (
+              <p className="text-gray-700 text-xs italic">Click failed grey dice to reroll (max 3, costs 1 WP)</p>
+            )
           )}
         </div>
       )}
@@ -597,7 +670,7 @@ export default function DiceRollerModal({
   // ── Sidebar mode: fixed right panel ──────────────────────────────────────────
   if (sidebar) {
     return (
-      <div className="fixed top-0 right-0 h-full w-[360px] bg-void-light border-l border-blood-dark z-40 shadow-2xl overflow-y-auto">
+      <div className="fixed top-0 right-0 h-full w-[300px] bg-void-light border-l border-blood-dark z-40 shadow-2xl overflow-y-auto">
         <div className="p-5">
           {innerContent}
         </div>

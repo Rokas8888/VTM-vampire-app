@@ -198,6 +198,7 @@ class SessionUpdateRequest(BaseModel):
     willpower_superficial:  Optional[int] = None
     willpower_aggravated:   Optional[int] = None
     humanity:               Optional[int] = None
+    humanity_stains:        Optional[int] = None
     blood_potency:          Optional[int] = None
 
 
@@ -250,6 +251,21 @@ class TenetAddRequest(BaseModel):
 class TempDotsRequest(BaseModel):
     """Set the temporary dots state for a character."""
     temp_dots: Optional[Dict[str, Any]] = None
+
+
+class NotesUpdateRequest(BaseModel):
+    """Update the notes field on a character's merit, flaw, or background."""
+    notes: Optional[str] = None
+
+
+class LevelUpdateRequest(BaseModel):
+    """Update the level (dot count) of a merit or background."""
+    level: int
+
+
+class LearningDotsRequest(BaseModel):
+    """Save the full learning_dots map for a character."""
+    learning_dots: Dict[str, int]
 
 
 
@@ -338,6 +354,7 @@ class CharacterBackgroundOut(BaseModel):
 
 class CharacterFlawOut(BaseModel):
     flaw: FlawOut
+    level: Optional[int] = None
     notes: Optional[str]
     class Config:
         from_attributes = True
@@ -458,6 +475,7 @@ class CharacterOut(BaseModel):
     possessions: List[PossessionOut] = []
     rituals: List[CharacterRitualOut] = []
     temp_dots: Optional[Dict[str, Any]] = None
+    learning_dots: Optional[Dict[str, Any]] = None
     is_retainer: bool = False
     parent_character_id: Optional[int] = None
     retainer_level: Optional[int] = None
