@@ -960,8 +960,8 @@ export default function CharacterSheet({
   }, [character.health]);
 
   useEffect(() => {
-    setWpTrack(buildTrack(character.willpower, character.willpower_superficial, character.willpower_aggravated));
-  }, [character.willpower]);
+    if (!sessionDirty) setWpTrack(buildTrack(character.willpower, character.willpower_superficial, character.willpower_aggravated));
+  }, [character.willpower, character.willpower_superficial, character.willpower_aggravated]);
 
   useEffect(() => {
     setCurrentHumanity(character.humanity);

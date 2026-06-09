@@ -247,6 +247,7 @@ export default function DiceRollerModal({
   characterId = null,
   sidebar = false,        // if true: fixed sidebar, not full-screen overlay
   willpowerSuperficial = 0,
+  willpowerAggravated = 0,
   willpowerMax = 0,
   onWillpowerSpend = null,
 }) {
@@ -259,8 +260,8 @@ export default function DiceRollerModal({
   const [history,           setHistory]           = useState([]);
   const [historyOpen,       setHistoryOpen]       = useState(false);
   const [simpleMode,        setSimpleMode]        = useState(false); // ignore hunger dice entirely
-  const [selectedForReroll, setSelectedForReroll] = useState(new Set());
   const [hasRerolled,       setHasRerolled]       = useState(false);
+  const [showWpWarning,     setShowWpWarning]     = useState(false);
 
   const hungerCount = mode === "remorse" || simpleMode
     ? 0
@@ -275,43 +276,51 @@ export default function DiceRollerModal({
 
   useEffect(() => { fetchHistory(); }, []);
 
-  const toggleSelect = (i) => {
-    setSelectedForReroll(prev => {
-      const next = new Set(prev);
-      if (next.has(i)) { next.delete(i); }
-      else if (next.size < 3) { next.add(i); }
-      return next;
-    });
-  };
-
   const wpFull = willpowerMax > 0 && willpowerSuperficial >= willpowerMax;
 
-  const handleReroll = async () => {
-    const newDice = dice.map((d, i) =>
-      selectedForReroll.has(i)
-        ? { ...d, value: Math.floor(Math.random() * 10) + 1 }
-        : d
-    );
-    setDice(newDice);
-    setResults(analyze(newDice));
-    setHasRerolled(true);
-    setSelectedForReroll(new Set());
-    if (characterId) {
-      try {
-        await api.put(`/api/characters/${characterId}/session`, {
-          willpower_superficial: willpowerSuperficial + 1,
-        });
-        onWillpowerSpend?.();
-      } catch (_) {}
-    }
+  const rerollableDice = dice.reduce((acc, d, i) => {
+    if (!d.isHunger && d.value <= 5 && acc.length < 3) acc.push(i);
+    return acc;
+  }, []);
+
+  const handleReroll = () => {
+    const toReroll = new Set(rerollableDice);
+    const snapshot = dice;
+    const nextKey = rollCount + 1;
+    setRollCount(nextKey);
+    setShowWpWarning(false);
+    // Blank only the rerolled dice with a new animKey — triggers throw animation on those dice only
+    setDice(snapshot.map((d, i) =>
+      toReroll.has(i) ? { ...d, value: 0, animKey: nextKey } : d
+    ));
+    setResults(null);
+
+    setTimeout(async () => {
+      const newDice = snapshot.map((d, i) =>
+        toReroll.has(i) ? { ...d, value: Math.floor(Math.random() * 10) + 1, animKey: nextKey } : d
+      );
+      setDice(newDice);
+      setResults(analyze(newDice));
+      setHasRerolled(true);
+      if (characterId) {
+        try {
+          await api.put(`/api/characters/${characterId}/session`,
+            wpFull
+              ? { willpower_aggravated: willpowerAggravated + 1 }
+              : { willpower_superficial: willpowerSuperficial + 1 }
+          );
+          onWillpowerSpend?.();
+        } catch (_) {}
+      }
+    }, 1000);
   };
 
   const roll = () => {
     setRollCount((c) => c + 1);
     setRolling(true);
     setResults(null);
-    setSelectedForReroll(new Set());
     setHasRerolled(false);
+    setShowWpWarning(false);
     const count = mode === "remorse" ? remorsePool : numDice;
     setDice(Array.from({ length: count }, (_, i) => ({ value: 0, isHunger: i < hungerCount })));
     const finalDice = rollPool(count, hungerCount);
@@ -509,22 +518,11 @@ export default function DiceRollerModal({
           {dice.length === 0 ? (
             <p className="text-red-900/50 font-gothic tracking-widest text-sm">Cast the dice upon the altar…</p>
           ) : (
-            dice.map((d, i) => {
-              const canSelect = mode === "normal" && !d.isHunger && d.value <= 5 && results !== null && !rolling && !hasRerolled;
-              const isSelected = selectedForReroll.has(i);
-              return (
-                <div
-                  key={i}
-                  onClick={canSelect ? () => toggleSelect(i) : undefined}
-                  className={`rounded transition-all ${
-                    isSelected    ? "ring-2 ring-blood cursor-pointer" :
-                    canSelect     ? "cursor-pointer hover:ring-1 hover:ring-gray-500" : ""
-                  }`}
-                >
-                  <ThrowingDie value={d.value} isHunger={d.isHunger} rolling={rolling} animKey={rollCount} />
-                </div>
-              );
-            })
+            dice.map((d, i) => (
+              <div key={i}>
+                <ThrowingDie value={d.value} isHunger={d.isHunger} rolling={rolling} animKey={d.animKey ?? rollCount} />
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -552,24 +550,40 @@ export default function DiceRollerModal({
       )}
 
       {/* Willpower Reroll — normal mode only, once per roll */}
-      {mode === "normal" && results && !rolling && !hasRerolled && (
+      {mode === "normal" && results && !rolling && !hasRerolled && rerollableDice.length > 0 && (
         <div className="mb-4 flex flex-col items-center gap-1.5">
-          {selectedForReroll.size > 0 ? (
-            wpFull ? (
-              <span className="text-gray-600 text-xs">✕ No Willpower remaining — cannot reroll</span>
-            ) : (
+          <button
+            onClick={() => wpFull ? setShowWpWarning(true) : handleReroll()}
+            className="bg-blood hover:bg-blood-dark text-white text-xs font-gothic tracking-wider px-3 py-1.5 rounded transition-colors"
+          >
+            Reroll ({rerollableDice.length} {rerollableDice.length === 1 ? "die" : "dice"}) — costs 1 WP
+          </button>
+        </div>
+      )}
+
+      {/* WP aggravated warning modal */}
+      {showWpWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-void border border-blood rounded p-5 max-w-xs w-full mx-4 text-center">
+            <p className="font-gothic text-blood text-lg mb-2">Willpower Broken</p>
+            <p className="text-gray-300 text-sm mb-4">
+              Your Willpower track is full — this reroll will deal <span className="text-red-400 font-bold">Aggravated</span> damage instead of Superficial.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setShowWpWarning(false)}
+                className="px-3 py-1.5 rounded text-xs font-gothic tracking-wider border border-void-border text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleReroll}
-                className="bg-blood hover:bg-blood-dark text-white text-xs font-gothic tracking-wider px-3 py-1.5 rounded transition-colors"
+                className="px-3 py-1.5 rounded text-xs font-gothic tracking-wider bg-blood hover:bg-blood-dark text-white transition-colors"
               >
-                Reroll {selectedForReroll.size} {selectedForReroll.size === 1 ? "die" : "dice"} — costs 1 WP
+                Reroll anyway
               </button>
-            )
-          ) : (
-            dice.some(d => !d.isHunger && d.value <= 5) && (
-              <p className="text-gray-700 text-xs italic">Click failed grey dice to reroll (max 3, costs 1 WP)</p>
-            )
-          )}
+            </div>
+          </div>
         </div>
       )}
 

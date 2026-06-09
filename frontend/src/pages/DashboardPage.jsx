@@ -542,27 +542,27 @@ export default function DashboardPage() {
       {/* ── Character action bar (only when a character is open) ── */}
       {selected && !editMode && (
         <div className="border-b border-void-border bg-void px-3 sm:px-6 py-2">
-          <div className="max-w-5xl mx-auto flex flex-wrap items-center gap-1">
+          <div className="max-w-5xl mx-auto flex flex-wrap items-center gap-x-2 gap-y-1.5">
 
             {/* Back */}
             <button
               onClick={closeDetail}
-              className="text-gray-600 hover:text-blood text-xs font-gothic tracking-wider transition-colors mr-3"
+              className="text-gray-600 hover:text-blood text-xs font-gothic tracking-wider transition-colors"
             >
               ← All Characters
             </button>
 
-            <div className="h-4 border-l border-void-border mr-3" />
+            <div className="hidden sm:block h-4 border-l border-void-border" />
 
             {/* XP counter — hidden for retainers */}
             {!selected.is_retainer && (
-              <span className="text-xs text-gray-500 mr-1">
+              <span className="text-xs text-gray-500">
                 XP: <span className="text-blood font-bold">{availableXp}</span>
                 <span className="text-gray-700"> / {selected.total_xp}</span>
               </span>
             )}
 
-            <div className="h-4 border-l border-void-border mx-1" />
+            <div className="hidden sm:block h-4 border-l border-void-border" />
 
             {/* XP button + Mode dropdown — hidden for retainers */}
             {!selected.is_retainer && <>
@@ -612,7 +612,7 @@ export default function DashboardPage() {
                 >✕</button>
               </div>
 
-              <div className="h-4 border-l border-void-border mx-1" />
+              <div className="hidden sm:block h-4 border-l border-void-border" />
             </>}
 
             {/* Messages — hidden for retainers */}
@@ -717,6 +717,7 @@ export default function DashboardPage() {
             sidebar={true}
             characterId={selected?.id ?? null}
             willpowerSuperficial={selected?.willpower_superficial ?? 0}
+            willpowerAggravated={selected?.willpower_aggravated ?? 0}
             willpowerMax={selected?.willpower ?? 0}
             onWillpowerSpend={async () => {
               if (selected?.id) {
