@@ -972,7 +972,7 @@ export default function CharacterSheet({
   }, [character.blood_potency]);
 
   useEffect(() => {
-    setStains(character.humanity_stains ?? 0);
+    if (!sessionDirty) setStains(character.humanity_stains ?? 0);
   }, [character.humanity_stains]);
 
   // Load game data lists when the add-advantage panel opens
@@ -1038,13 +1038,14 @@ export default function CharacterSheet({
   const setWT  = (v) => { setWpTrack(v); dirty(); };
 
   // The core save call with explicit values (used after remorse resolution)
-  const performSave = async (humanity, stainCount) => {
+  const performSave = async (humanity, stains) => {
     if (!onSaveSession) return;
     setSaving(true);
     await onSaveSession({
       blood_potency:          currentBP,
       current_hunger:         currentHunger,
       humanity,
+      humanity_stains:        stains,
       health_superficial:     healthTrack.filter((s) => s === 1).length,
       health_aggravated:      healthTrack.filter((s) => s === 2).length,
       willpower_superficial:  wpTrack.filter((s) => s === 1).length,
@@ -1052,9 +1053,9 @@ export default function CharacterSheet({
     });
     setSaving(false);
     setSessionDirty(false);
-    // stainCount should be 0 after remorse; update local state
+    // stains should be 0 after remorse; update local state
     setCurrentHumanity(humanity);
-    setStains(stainCount);
+    setStains(stains);
   };
 
   // "End Session" button handler
@@ -1078,7 +1079,7 @@ export default function CharacterSheet({
     setShowRemorse(false);
   };
 
-  // Remorse pool = empty boxes = max(1, 10 - filled - stained)
+  // Remorse pool = empty unstained boxes: (10 − humanity) − stains, min 1 (V5 RAW)
   const remorsePool = Math.max(1, 10 - currentHumanity - stains);
 
   // Lookup maps

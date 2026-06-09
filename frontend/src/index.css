@@ -185,3 +185,10 @@ textarea.vtm-input {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #0a0a0a; }
 ::-webkit-scrollbar-thumb { background: #8B0000; border-radius: 3px; }
+
+/* Humanity stain ring — very slow subtle breathe */
+@keyframes stain-ring-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(220, 20, 60, 0.6), 0 0 5px 1px rgba(220, 20, 60, 0.18); }
+  50%       { box-shadow: 0 0 0 2px rgba(220, 20, 60, 0.2), 0 0 2px 0px rgba(220, 20, 60, 0.05); }
+}
+.animate-stain { animation: stain-ring-breathe 4s ease-in-out infinite; }
