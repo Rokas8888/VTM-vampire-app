@@ -152,7 +152,8 @@ class CharacterMerit(Base):
     __tablename__ = "character_merits"
     id = Column(Integer, primary_key=True)
     character_id = Column(Integer, ForeignKey("characters.id"), nullable=False)
-    merit_id = Column(Integer, ForeignKey("merits.id"), nullable=False)
+    merit_id = Column(Integer, ForeignKey("merits.id"), nullable=True)
+    custom_name = Column(String, nullable=True)  # set for a user-written custom merit (merit_id is NULL)
     level = Column(Integer, default=1)
     notes = Column(String)
     character = relationship("Character", back_populates="merits")
@@ -163,7 +164,8 @@ class CharacterBackground(Base):
     __tablename__ = "character_backgrounds"
     id = Column(Integer, primary_key=True)
     character_id = Column(Integer, ForeignKey("characters.id"), nullable=False)
-    background_id = Column(Integer, ForeignKey("backgrounds.id"), nullable=False)
+    background_id = Column(Integer, ForeignKey("backgrounds.id"), nullable=True)
+    custom_name = Column(String, nullable=True)  # set for a user-written custom background (background_id is NULL)
     level = Column(Integer, default=1)
     notes = Column(String)
     character = relationship("Character", back_populates="backgrounds")
@@ -174,7 +176,8 @@ class CharacterFlaw(Base):
     __tablename__ = "character_flaws"
     id = Column(Integer, primary_key=True)
     character_id = Column(Integer, ForeignKey("characters.id"), nullable=False)
-    flaw_id = Column(Integer, ForeignKey("flaws.id"), nullable=False)
+    flaw_id = Column(Integer, ForeignKey("flaws.id"), nullable=True)
+    custom_name = Column(String, nullable=True)  # set for a user-written custom flaw (flaw_id is NULL)
     level = Column(Integer, nullable=True)
     notes = Column(String)
     character = relationship("Character", back_populates="flaws")

@@ -1170,49 +1170,55 @@ def add_merit(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Add a merit to a character the player owns."""
+    """Add a merit — game-data (merit_id) OR custom (custom_name)."""
     from app.models.game_data import Merit
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
-    merit = db.query(Merit).filter(Merit.id == body.merit_id).first()
-    if not merit:
-        raise HTTPException(status_code=404, detail="Merit not found.")
-    existing = db.query(CharacterMerit).filter(
-        CharacterMerit.character_id == character_id,
-        CharacterMerit.merit_id == body.merit_id,
-        CharacterMerit.level == body.level,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Merit at this level already on character.")
-    db.add(CharacterMerit(character_id=character_id, merit_id=body.merit_id, level=body.level))
+    if body.custom_name:
+        db.add(CharacterMerit(
+            character_id=character_id,
+            custom_name=body.custom_name.strip(),
+            level=body.level,
+            notes=body.notes or None,
+        ))
+    elif body.merit_id:
+        merit = db.query(Merit).filter(Merit.id == body.merit_id).first()
+        if not merit:
+            raise HTTPException(status_code=404, detail="Merit not found.")
+        existing = db.query(CharacterMerit).filter(
+            CharacterMerit.character_id == character_id,
+            CharacterMerit.merit_id == body.merit_id,
+            CharacterMerit.level == body.level,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Merit at this level already on character.")
+        db.add(CharacterMerit(character_id=character_id, merit_id=body.merit_id, level=body.level, notes=body.notes or None))
+    else:
+        raise HTTPException(status_code=400, detail="Provide either merit_id or custom_name.")
     db.commit()
     return load_full_character(char.id, db)
 
 
-@router.delete("/{character_id}/merits/{merit_id}", response_model=CharacterOut)
+@router.delete("/{character_id}/merits/{char_merit_id}", response_model=CharacterOut)
 def remove_merit(
     character_id: int,
-    merit_id: int,
-    level: int = None,
+    char_merit_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Remove a merit from a character the player owns."""
+    """Remove a merit by CharacterMerit row id (works for game-data and custom)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
-    q = db.query(CharacterMerit).filter(
+    cm = db.query(CharacterMerit).filter(
+        CharacterMerit.id == char_merit_id,
         CharacterMerit.character_id == character_id,
-        CharacterMerit.merit_id == merit_id,
-    )
-    if level is not None:
-        q = q.filter(CharacterMerit.level == level)
-    cm = q.first()
+    ).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Merit not on character.")
     db.delete(cm)
@@ -1220,23 +1226,23 @@ def remove_merit(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/merits/{merit_id}/notes", response_model=CharacterOut)
+@router.patch("/{character_id}/merits/{char_merit_id}/notes", response_model=CharacterOut)
 def update_merit_notes(
     character_id: int,
-    merit_id: int,
+    char_merit_id: int,
     body: NotesUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the notes on a character's merit."""
+    """Update the notes on a character's merit (by CharacterMerit row id)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     cm = db.query(CharacterMerit).filter(
+        CharacterMerit.id == char_merit_id,
         CharacterMerit.character_id == character_id,
-        CharacterMerit.merit_id == merit_id,
     ).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Merit not on character.")
@@ -1245,15 +1251,15 @@ def update_merit_notes(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/merits/{merit_id}/level", response_model=CharacterOut)
+@router.patch("/{character_id}/merits/{char_merit_id}/level", response_model=CharacterOut)
 def update_merit_level(
     character_id: int,
-    merit_id: int,
+    char_merit_id: int,
     body: LevelUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Set the level of a merit. Accessible by the character owner or a GM with group access."""
+    """Set the level of a merit (by CharacterMerit row id). Owner or GM with group access."""
     char = db.query(Character).filter(Character.id == character_id).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
@@ -1272,8 +1278,8 @@ def update_merit_level(
             if not has_access:
                 raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
     cm = db.query(CharacterMerit).filter(
+        CharacterMerit.id == char_merit_id,
         CharacterMerit.character_id == character_id,
-        CharacterMerit.merit_id == merit_id,
     ).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Merit not on character.")
@@ -1291,43 +1297,48 @@ def add_flaw(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Add a flaw to a character the player owns."""
+    """Add a flaw — game-data (flaw_id) OR custom (custom_name)."""
     from app.models.game_data import Flaw
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
-    flaw = db.query(Flaw).filter(Flaw.id == body.flaw_id).first()
-    if not flaw:
-        raise HTTPException(status_code=404, detail="Flaw not found.")
-    existing = db.query(CharacterFlaw).filter(
-        CharacterFlaw.character_id == character_id,
-        CharacterFlaw.flaw_id == body.flaw_id,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Flaw already on character.")
-    db.add(CharacterFlaw(character_id=character_id, flaw_id=body.flaw_id, notes=body.notes))
+    if body.custom_name:
+        db.add(CharacterFlaw(character_id=character_id, custom_name=body.custom_name.strip(), level=body.level, notes=body.notes or None))
+    elif body.flaw_id:
+        flaw = db.query(Flaw).filter(Flaw.id == body.flaw_id).first()
+        if not flaw:
+            raise HTTPException(status_code=404, detail="Flaw not found.")
+        existing = db.query(CharacterFlaw).filter(
+            CharacterFlaw.character_id == character_id,
+            CharacterFlaw.flaw_id == body.flaw_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Flaw already on character.")
+        db.add(CharacterFlaw(character_id=character_id, flaw_id=body.flaw_id, notes=body.notes or None))
+    else:
+        raise HTTPException(status_code=400, detail="Provide either flaw_id or custom_name.")
     db.commit()
     return load_full_character(char.id, db)
 
 
-@router.delete("/{character_id}/flaws/{flaw_id}", response_model=CharacterOut)
+@router.delete("/{character_id}/flaws/{char_flaw_id}", response_model=CharacterOut)
 def remove_flaw(
     character_id: int,
-    flaw_id: int,
+    char_flaw_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Remove a flaw from a character the player owns."""
+    """Remove a flaw by CharacterFlaw row id (works for game-data and custom)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     cf = db.query(CharacterFlaw).filter(
+        CharacterFlaw.id == char_flaw_id,
         CharacterFlaw.character_id == character_id,
-        CharacterFlaw.flaw_id == flaw_id,
     ).first()
     if not cf:
         raise HTTPException(status_code=404, detail="Flaw not on character.")
@@ -1336,23 +1347,23 @@ def remove_flaw(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/flaws/{flaw_id}/notes", response_model=CharacterOut)
+@router.patch("/{character_id}/flaws/{char_flaw_id}/notes", response_model=CharacterOut)
 def update_flaw_notes(
     character_id: int,
-    flaw_id: int,
+    char_flaw_id: int,
     body: NotesUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the notes on a character's flaw."""
+    """Update the notes on a character's flaw (by CharacterFlaw row id)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     cf = db.query(CharacterFlaw).filter(
+        CharacterFlaw.id == char_flaw_id,
         CharacterFlaw.character_id == character_id,
-        CharacterFlaw.flaw_id == flaw_id,
     ).first()
     if not cf:
         raise HTTPException(status_code=404, detail="Flaw not on character.")
@@ -1361,10 +1372,10 @@ def update_flaw_notes(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/flaws/{flaw_id}/level", response_model=CharacterOut)
+@router.patch("/{character_id}/flaws/{char_flaw_id}/level", response_model=CharacterOut)
 def update_flaw_level(
     character_id: int,
-    flaw_id: int,
+    char_flaw_id: int,
     body: LevelUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -1387,8 +1398,8 @@ def update_flaw_level(
             if not has_access:
                 raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
     cf = db.query(CharacterFlaw).filter(
+        CharacterFlaw.id == char_flaw_id,
         CharacterFlaw.character_id == character_id,
-        CharacterFlaw.flaw_id == flaw_id,
     ).first()
     if not cf:
         raise HTTPException(status_code=404, detail="Flaw not on character.")
@@ -1406,48 +1417,58 @@ def add_background(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Add a background to a character the player owns."""
+    """Add a background — game-data (background_id) OR custom (custom_name)."""
     from app.models.game_data import Background
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
-    bg = db.query(Background).filter(Background.id == body.background_id).first()
-    if not bg:
-        raise HTTPException(status_code=404, detail="Background not found.")
-    existing = db.query(CharacterBackground).filter(
-        CharacterBackground.character_id == character_id,
-        CharacterBackground.background_id == body.background_id,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Background already on character.")
-    db.add(CharacterBackground(
-        character_id=character_id,
-        background_id=body.background_id,
-        level=body.level,
-        notes=getattr(body, "notes", None),
-    ))
+    if body.custom_name:
+        db.add(CharacterBackground(
+            character_id=character_id,
+            custom_name=body.custom_name.strip(),
+            level=body.level,
+            notes=body.notes or None,
+        ))
+    elif body.background_id:
+        bg = db.query(Background).filter(Background.id == body.background_id).first()
+        if not bg:
+            raise HTTPException(status_code=404, detail="Background not found.")
+        existing = db.query(CharacterBackground).filter(
+            CharacterBackground.character_id == character_id,
+            CharacterBackground.background_id == body.background_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Background already on character.")
+        db.add(CharacterBackground(
+            character_id=character_id,
+            background_id=body.background_id,
+            level=body.level,
+            notes=body.notes or None,
+        ))
+    else:
+        raise HTTPException(status_code=400, detail="Provide either background_id or custom_name.")
     db.commit()
     return load_full_character(char.id, db)
 
 
-@router.delete("/{character_id}/backgrounds/{background_id}", response_model=CharacterOut)
+@router.delete("/{character_id}/backgrounds/{char_background_id}", response_model=CharacterOut)
 def remove_background(
     character_id: int,
-    background_id: int,
+    char_background_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Remove a background from a character the player owns."""
+    """Remove a background by CharacterBackground row id (works for game-data and custom)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     cb = db.query(CharacterBackground).filter(
+        CharacterBackground.id == char_background_id,
         CharacterBackground.character_id == character_id,
-        CharacterBackground.background_id == background_id,
     ).first()
     if not cb:
         raise HTTPException(status_code=404, detail="Background not on character.")
@@ -1456,23 +1477,23 @@ def remove_background(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/backgrounds/{background_id}/notes", response_model=CharacterOut)
+@router.patch("/{character_id}/backgrounds/{char_background_id}/notes", response_model=CharacterOut)
 def update_background_notes(
     character_id: int,
-    background_id: int,
+    char_background_id: int,
     body: NotesUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Update the notes on a character's background."""
+    """Update the notes on a character's background (by CharacterBackground row id)."""
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
     if not char:
         raise HTTPException(status_code=404, detail="Character not found.")
     cb = db.query(CharacterBackground).filter(
+        CharacterBackground.id == char_background_id,
         CharacterBackground.character_id == character_id,
-        CharacterBackground.background_id == background_id,
     ).first()
     if not cb:
         raise HTTPException(status_code=404, detail="Background not on character.")
@@ -1481,10 +1502,10 @@ def update_background_notes(
     return load_full_character(char.id, db)
 
 
-@router.patch("/{character_id}/backgrounds/{background_id}/level", response_model=CharacterOut)
+@router.patch("/{character_id}/backgrounds/{char_background_id}/level", response_model=CharacterOut)
 def update_background_level(
     character_id: int,
-    background_id: int,
+    char_background_id: int,
     body: LevelUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -1507,8 +1528,8 @@ def update_background_level(
             if not has_access:
                 raise HTTPException(status_code=403, detail="Character is not in one of your groups.")
     cb = db.query(CharacterBackground).filter(
+        CharacterBackground.id == char_background_id,
         CharacterBackground.character_id == character_id,
-        CharacterBackground.background_id == background_id,
     ).first()
     if not cb:
         raise HTTPException(status_code=404, detail="Background not on character.")
@@ -1747,7 +1768,15 @@ def remove_discipline(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Remove a discipline from a character (used for retainers)."""
+    """
+    Fully remove a discipline from a character (clean teardown):
+      1. Refund XP for EVERY dot, matching the Improve-mode minus button
+         (sum of level x factor for level = 1..current; factor = 5 in-clan / 7 out).
+         Free creation dots are refunded too, consistent with `unimprove`.
+      2. Delete ALL learned powers belonging to this discipline (fixes the
+         orphaned-power bug where a removed discipline left ghost powers).
+      3. Delete the CharacterDiscipline row.
+    """
     char = db.query(Character).filter(
         Character.id == character_id, Character.user_id == current_user.id
     ).first()
@@ -1759,7 +1788,68 @@ def remove_discipline(
     ).first()
     if not cd:
         raise HTTPException(status_code=404, detail="Discipline not found.")
+
+    # 1. Refund XP for all dots. In-clan dot = level x 5, out-of-clan = level x 7.
+    from sqlalchemy import and_
+    from app.models.game_data import clan_disciplines as clan_disc_table
+    is_in_clan = db.execute(
+        clan_disc_table.select().where(
+            and_(
+                clan_disc_table.c.clan_id == char.clan_id,
+                clan_disc_table.c.discipline_id == discipline_id,
+            )
+        )
+    ).first() is not None
+    factor = 5 if is_in_clan else 7
+    total_refund = factor * (cd.level * (cd.level + 1) // 2)  # 5x(1+2+...+level)
+    _apply_refund(char, total_refund)
+
+    # 2. Delete all learned powers belonging to this discipline.
+    powers_to_remove = (
+        db.query(CharacterPower)
+        .join(DisciplinePower, CharacterPower.power_id == DisciplinePower.id)
+        .filter(
+            CharacterPower.character_id == character_id,
+            DisciplinePower.discipline_id == discipline_id,
+        ).all()
+    )
+    for cp in powers_to_remove:
+        db.delete(cp)
+
+    # 3. Delete the discipline itself.
     db.delete(cd)
+    db.commit()
+    return load_full_character(character_id, db)
+
+
+@router.delete("/{character_id}/powers/{power_id}", response_model=CharacterOut)
+def remove_power(
+    character_id: int,
+    power_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a single learned discipline power. No XP refund and no dot change:
+    the discipline simply becomes 'underpowered' at that level, which the UI
+    surfaces with the warning so a replacement power can be re-picked at that
+    level via the existing claim flow.
+
+    `power_id` is the DisciplinePower id (matches the frontend power.id and the
+    CharacterPower.power_id FK).
+    """
+    char = db.query(Character).filter(
+        Character.id == character_id, Character.user_id == current_user.id
+    ).first()
+    if not char:
+        raise HTTPException(status_code=404, detail="Character not found.")
+    cp = db.query(CharacterPower).filter(
+        CharacterPower.character_id == character_id,
+        CharacterPower.power_id == power_id,
+    ).first()
+    if not cp:
+        raise HTTPException(status_code=404, detail="Power not found.")
+    db.delete(cp)
     db.commit()
     return load_full_character(character_id, db)
 

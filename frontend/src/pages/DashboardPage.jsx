@@ -115,9 +115,6 @@ export default function DashboardPage() {
   // temp dots mode
   const [tempMode, setTempMode] = useState(false);
 
-  // edit advantages mode (merits/flaws/backgrounds)
-  const [editAdvantagesMode, setEditAdvantagesMode] = useState(false);
-
   // learning dots mode
   const [learningMode, setLearningMode] = useState(false);
 
@@ -171,7 +168,6 @@ export default function DashboardPage() {
     setEditMode(false);
     setXpAmount(""); setXpError(null);
     setTempMode(false);
-    setEditAdvantagesMode(false);
     setLearningMode(false);
     setShowMessages(false);
     setCharMessages([]);
@@ -585,7 +581,6 @@ export default function DashboardPage() {
                   value={
                     improveMode ? "improve" :
                     tempMode ? "temp" :
-                    editAdvantagesMode ? "merits" :
                     learningMode ? "learning" : "none"
                   }
                   onChange={e => {
@@ -593,12 +588,11 @@ export default function DashboardPage() {
                     if (v === "ambition") { openEdit(); return; }
                     setImproveMode(v === "improve");
                     setTempMode(v === "temp");
-                    setEditAdvantagesMode(v === "merits");
                     setLearningMode(v === "learning");
                     if (v === "improve") { setImproveError(null); closePanel(); }
                   }}
                   className={`shrink-0 w-auto max-w-[9rem] px-2 py-1 rounded text-xs font-gothic tracking-wider border transition-colors cursor-pointer ${
-                    improveMode || tempMode || editAdvantagesMode || learningMode
+                    improveMode || tempMode || learningMode
                       ? "border-blood text-blood bg-blood-dark/20"
                       : "border-void-border text-gray-500 bg-void hover:border-blood hover:text-blood"
                   }`}
@@ -607,14 +601,13 @@ export default function DashboardPage() {
                   <option value="none">Edit</option>
                   <option value="improve">Improve Stats</option>
                   <option value="temp">Temp Dots</option>
-                  <option value="merits">Edit Merits</option>
                   <option value="learning">Learning Dots</option>
                   <option value="ambition">Ambition &amp; Desire</option>
                 </select>
 
                 <button
-                  onClick={() => { setImproveMode(false); setTempMode(false); setEditAdvantagesMode(false); setLearningMode(false); }}
-                  className={`text-xs transition-colors leading-none px-1 ${improveMode || tempMode || editAdvantagesMode || learningMode ? "text-gray-500 hover:text-blood" : "invisible"}`}
+                  onClick={() => { setImproveMode(false); setTempMode(false); setLearningMode(false); }}
+                  className={`text-xs transition-colors leading-none px-1 ${improveMode || tempMode || learningMode ? "text-gray-500 hover:text-blood" : "invisible"}`}
                   title="Exit edit mode"
                 >✕</button>
               </div>
@@ -867,7 +860,6 @@ export default function DashboardPage() {
             onUnimprove={selected.is_retainer ? handleUnimprove : (improveMode ? handleUnimprove : undefined)}
             freeEdit={selected.is_retainer}
             tempMode={tempMode}
-            forceEditAdvantages={editAdvantagesMode}
             learningMode={learningMode}
             learningDots={selected?.learning_dots ?? {}}
             onSetLearningDot={handleSetLearningDot}

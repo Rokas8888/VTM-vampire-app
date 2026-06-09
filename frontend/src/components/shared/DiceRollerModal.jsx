@@ -15,8 +15,8 @@ function analyze(dice) {
   const tens       = dice.filter((d) => d.value === 10);
   const critPairs  = Math.floor(tens.length / 2);
   const hungerTen  = dice.some((d) => d.isHunger && d.value === 10);
-  // Bestial: any skull showing (hunger die 1-5) + zero total successes
-  const anySkull       = dice.some((d) => d.isHunger && d.value <= 5);
+  // Bestial: hunger die shows 1 (only) + zero total successes — V5 rule: 2–5 are plain failures
+  const anySkull       = dice.some((d) => d.isHunger && d.value === 1);
   const total          = successes + critPairs * 2;
   const messyCritical  = critPairs > 0 && hungerTen;
   const bestialFailure = total === 0 && anySkull;

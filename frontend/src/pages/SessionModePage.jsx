@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import ConditionManager from "../components/gm/ConditionManager";
 import { clanCardStyle } from "../utils/clanImages";
+import HumanityTracker from "../components/shared/HumanityTracker";
 
 function getRollHint(text) {
   if (!text) return null;
@@ -394,46 +395,33 @@ function SessionCard({ char, player, conditions, isGM, onConditionsChange, lastR
         </div>
       )}
 
-      {/* Blood Potency + Humanity + Stains + Hunger */}
+      {/* Blood Potency + Humanity + Hunger */}
       <div className="flex flex-col gap-1.5">
-        {[
-          { key: "blood_potency", label: "Blood Pot.", max: 5,  variant: "blood"  },
-          { key: "humanity",      label: "Humanity",   max: 10, variant: "blood"  },
-        ].map(({ key, label, max, variant }) => (
-          <div key={key} className="flex items-center gap-2">
-            <span className="text-xs text-gray-600 w-16 shrink-0">{label}</span>
-            <DotTracker
-              value={ls[key] ?? 0}
-              max={max}
-              variant={variant}
-              onSetValue={cardEditMode && isGM ? (val) => set(key, val) : undefined}
-            />
-          </div>
-        ))}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 w-16 shrink-0">Blood Pot.</span>
+          <DotTracker
+            value={ls.blood_potency ?? 0}
+            max={5}
+            variant="blood"
+            onSetValue={cardEditMode && isGM ? (val) => set("blood_potency", val) : undefined}
+          />
+        </div>
 
-        {/* Stains row — max slots = 10 - humanity; GM can toggle without edit mode */}
-        {(10 - ls.humanity) > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-600 w-16 shrink-0">Stains</span>
-            <div className="flex flex-wrap">
-              {Array.from({ length: 10 - ls.humanity }, (_, i) => (
-                <div
-                  key={i}
-                  onClick={isGM ? () => {
-                    const newVal = i + 1 === ls.humanity_stains ? i : i + 1;
-                    set("humanity_stains", newVal);
-                    api.put(`/api/characters/${char.id}/gm-adjust`, { humanity_stains: newVal }).catch(() => {});
-                  } : undefined}
-                  className={`w-3 h-3 rounded-full border mx-1 transition-all ${
-                    i < ls.humanity_stains
-                      ? "bg-blood-dark/50 border-blood-dark"
-                      : "border-gray-700 hover:border-gray-500"
-                  } ${isGM ? "cursor-pointer" : ""}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Humanity row — uses shared HumanityTracker for visual consistency with player sheet */}
+        <div className="flex items-start gap-2">
+          <span className="text-xs text-gray-600 w-16 shrink-0 pt-1">Humanity</span>
+          <HumanityTracker
+            value={ls.humanity ?? 0}
+            stains={ls.humanity_stains ?? 0}
+            onChangeHumanity={cardEditMode && isGM ? (v) => set("humanity", v) : undefined}
+            onChangeStains={isGM ? (v) => {
+              set("humanity_stains", v);
+              api.put(`/api/characters/${char.id}/gm-adjust`, { humanity_stains: v }).catch(() => {});
+            } : undefined}
+            freeEdit={cardEditMode && isGM}
+            showStainButtons={isGM}
+          />
+        </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-600 w-16 shrink-0">Hunger</span>

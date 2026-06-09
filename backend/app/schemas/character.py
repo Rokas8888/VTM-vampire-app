@@ -218,21 +218,25 @@ class ImproveRequest(BaseModel):
 
 
 class MeritAddRequest(BaseModel):
-    """Add a merit to a character."""
-    merit_id: int
+    """Add a merit — provide either merit_id (game-data) OR custom_name (user-written)."""
+    merit_id: Optional[int] = None
+    custom_name: Optional[str] = None
     level: int = 1
     notes: Optional[str] = None
 
 
 class FlawAddRequest(BaseModel):
-    """Add a flaw to a character."""
-    flaw_id: int
+    """Add a flaw — provide either flaw_id (game-data) OR custom_name (user-written)."""
+    flaw_id: Optional[int] = None
+    custom_name: Optional[str] = None
+    level: int = 1
     notes: Optional[str] = None
 
 
 class BackgroundAddRequest(BaseModel):
-    """Add a background to a character."""
-    background_id: int
+    """Add a background — provide either background_id (game-data) OR custom_name (user-written)."""
+    background_id: Optional[int] = None
+    custom_name: Optional[str] = None
     level: int = 1
     notes: Optional[str] = None
 
@@ -337,7 +341,9 @@ class CharacterPowerOut(BaseModel):
 
 
 class CharacterMeritOut(BaseModel):
-    merit: MeritOut
+    id: int                                  # CharacterMerit row id — use for level/notes/delete
+    merit: Optional[MeritOut] = None         # None for custom entries
+    custom_name: Optional[str] = None        # set for custom entries
     level: int
     notes: Optional[str]
     class Config:
@@ -345,7 +351,9 @@ class CharacterMeritOut(BaseModel):
 
 
 class CharacterBackgroundOut(BaseModel):
-    background: BackgroundOut
+    id: int
+    background: Optional[BackgroundOut] = None
+    custom_name: Optional[str] = None
     level: int
     notes: Optional[str]
     class Config:
@@ -353,7 +361,9 @@ class CharacterBackgroundOut(BaseModel):
 
 
 class CharacterFlawOut(BaseModel):
-    flaw: FlawOut
+    id: int
+    flaw: Optional[FlawOut] = None
+    custom_name: Optional[str] = None
     level: Optional[int] = None
     notes: Optional[str]
     class Config:
